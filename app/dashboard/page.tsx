@@ -167,19 +167,48 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#F6F5F2] pb-20 font-sans text-stone-900">
-      <nav className="bg-white border-b border-stone-200 px-8 py-5 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <h1 className="font-bold uppercase text-lg tracking-wider text-stone-800">Soulbook <span className="font-light text-stone-400">Admin</span></h1>
-          </div>
-          <div className="hidden md:flex bg-stone-100 p-1 rounded-xl gap-1">
-            <button onClick={() => setActiveTab('content')} className={`px-5 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${activeTab === 'content' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-400 hover:text-stone-600'}`}>Contenuti</button>
-            <button onClick={() => setActiveTab('messages')} className={`px-5 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${activeTab === 'messages' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-400 hover:text-stone-600'}`}>Messaggi ({messages.length})</button>
-          </div>
-        </div>
-        <button onClick={() => supabase.auth.signOut().then(() => router.push('/registrati'))} className="text-[10px] font-bold uppercase text-stone-400 hover:text-red-600 transition-all">Esci</button>
-      </nav>
+      <nav className="bg-white border-b border-stone-200 px-4 md:px-8 py-4 md:py-5 sticky top-0 z-50 shadow-sm">
+  <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+    
+    <div className="flex items-center justify-between w-full md:w-auto">
+      <h1 className="font-bold uppercase text-lg tracking-wider text-stone-800">
+        Soulbook <span className="font-light text-stone-400">Admin</span>
+      </h1>
+      
+      {/* BOTTONE ESCI - Versione Mobile (allineato a destra del titolo) */}
+      <button 
+        onClick={() => supabase.auth.signOut().then(() => router.push('/registrati'))} 
+        className="md:hidden px-4 py-2 bg-red-50 text-red-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-red-100 active:scale-95 transition-all"
+      >
+        Esci
+      </button>
+    </div>
 
+    {/* MENU TAB - Centrale e visibile ovunque */}
+    <div className="flex bg-stone-100 p-1 rounded-xl gap-1 w-full md:w-auto">
+      <button 
+        onClick={() => setActiveTab('content')} 
+        className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'content' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-400 hover:text-stone-600'}`}
+      >
+        Contenuti
+      </button>
+      <button 
+        onClick={() => setActiveTab('messages')} 
+        className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'messages' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-400 hover:text-stone-600'}`}
+      >
+        Messaggi ({messages.length})
+      </button>
+    </div>
+
+    {/* BOTTONE ESCI - Versione Desktop (staccato a destra) */}
+    <button 
+      onClick={() => supabase.auth.signOut().then(() => router.push('/registrati'))} 
+      className="hidden md:block px-5 py-2.5 bg-stone-50 text-stone-400 hover:text-red-600 hover:bg-red-50 border border-stone-100 hover:border-red-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+    >
+      Esci
+    </button>
+  </div>
+</nav>
       <div className="max-w-5xl mx-auto p-6 space-y-8 mt-4">
         {activeTab === 'content' ? (
           <div className="space-y-8 animate-in fade-in duration-500">
@@ -460,7 +489,7 @@ className="flex-1 bg-stone-800 text-white py-3 rounded-lg text-[10px] font-bold 
       <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-stone-200 p-4 z-[100] shadow-lg">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
           <div className="hidden md:flex items-center gap-2 text-stone-400">
-            <span className="text-[10px] font-bold uppercase tracking-widest italic">Soulbook Revision</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest italic">Vedi e Conferma le tue scelte</span>
           </div>
           <div className="flex gap-3 w-full md:w-auto">
             <a href={`/${profile?.slug}`} target="_blank" className="flex-1 md:flex-none px-6 py-4 bg-stone-100 text-stone-600 rounded-xl text-[10px] font-bold uppercase hover:bg-stone-200 transition-all text-center">Anteprima</a>

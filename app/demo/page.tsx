@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import Link from 'next/link'; // Importiamo Link per una navigazione fluida
 
 export default function DemoProfile() {
   const [activeTab, setActiveTab] = useState<'home' | 'media'>('home');
@@ -149,18 +150,18 @@ export default function DemoProfile() {
       {/* FOOTER */}
       <footer className="py-32 mt-20 text-center opacity-10 text-[9px] font-black uppercase tracking-[1.5em]">SoulBook Preview</footer>
 
-      {/* CTA BANNER - CORRETTO */}
+      {/* CTA BANNER - AGGIORNATO CON LOGICA /REGISTRATI */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] flex justify-between items-center animate-in slide-in-from-bottom-20 duration-1000">
         <div className="space-y-1">
-          <p className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-400">Anteprima</p>
-          <p className="text-[13px] font-black uppercase tracking-tight text-slate-900">Inizia il tuo progetto</p>
+          <p className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-400">Crea adesso il tuo soulbook</p>
+      
         </div>
-        <a 
-          href="/registrati" 
-          className="bg-slate-900 text-white px-10 py-4 rounded-full text-[10px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-blue-600 hover:scale-105 transition-all"
+        <Link 
+          href="/registrati?mode=signup" 
+          className="bg-slate-900 text-white px-10 py-4 rounded-full text-[10px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-black hover:scale-105 transition-all"
         >
           Crea ora
-        </a>
+        </Link>
       </div>
     </div>
   );
