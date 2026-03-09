@@ -3,16 +3,13 @@
 import { useState, useEffect, Suspense } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link'; // Aggiunto per il ritorno alla Home
+import Link from 'next/link';
 
 function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // Legge il parametro ?mode=... dall'URL
   const mode = searchParams.get('mode');
-
-  // Imposta lo stato iniziale: se mode è 'signup', mostra registrazione, altrimenti login
   const [isLogin, setIsLogin] = useState(mode !== 'signup');
   
   const [email, setEmail] = useState('');
@@ -22,7 +19,6 @@ function AuthContent() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Aggiorna lo stato se il parametro nell'URL cambia (es. l'utente clicca un altro link)
   useEffect(() => {
     if (mode === 'signup') setIsLogin(false);
     if (mode === 'login') setIsLogin(true);
@@ -34,10 +30,12 @@ function AuthContent() {
     setErrorMsg(null);
 
     try {
+      let userId: string | undefined;
+
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw new Error("Email o password errati.");
-        router.push('/dashboard');
+        userId = authData.user?.id;
       } else {
         const { data: authData, error: authError } = await supabase.auth.signUp({ 
           email, 
@@ -48,6 +46,7 @@ function AuthContent() {
         if (authError) throw authError;
 
         if (authData.user) {
+          userId = authData.user.id;
           const { error: profileError } = await supabase
             .from('profiles')
             .update({ 
@@ -56,12 +55,27 @@ function AuthContent() {
               bio: "Benvenuti nel mio spazio dei ricordi.",
               updated_at: new Date().toISOString(),
             })
-            .eq('owner_id', authData.user.id);
+            .eq('owner_id', userId);
 
           if (profileError) throw profileError;
-          router.push('/dashboard');
         }
       }
+
+      // --- LOGICA DI REDIRECT INTELLIGENTE ---
+      if (userId) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('owner_id', userId)
+          .single();
+
+        if (profile?.is_admin) {
+          router.push('/admin'); // Se admin, vai al pannello operativo
+        } else {
+          router.push('/dashboard'); // Altrimenti dashboard normale
+        }
+      }
+
     } catch (err: any) {
       setErrorMsg(err.message || "Si è verificato un errore imprevisto.");
     } finally {
@@ -71,8 +85,6 @@ function AuthContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
-      
-      {/* --- HEADER AGGIUNTO (STILE HOME) --- */}
       <header className="w-full px-8 py-6 max-w-7xl mx-auto flex justify-start">
         <Link 
           href="/" 
@@ -82,7 +94,6 @@ function AuthContent() {
         </Link>
       </header>
 
-      {/* --- FORM CONTAINER --- */}
       <div className="flex-grow flex flex-col justify-center pb-20 px-4">
         <div className="max-w-md w-full mx-auto bg-white rounded-3xl shadow-xl border border-gray-100 p-10">
           
@@ -99,7 +110,7 @@ function AuthContent() {
           </div>
 
           {errorMsg && (
-            <div className="mb-6 p-4 bg-red-50 text-red-700 text-xs font-bold rounded-xl border border-red-100 animate-in fade-in zoom-in duration-300">
+            <div className="mb-6 p-4 bg-red-50 text-red-700 text-xs font-bold rounded-xl border border-red-100">
               {errorMsg}
             </div>
           )}
@@ -166,7 +177,6 @@ function AuthContent() {
   );
 }
 
-// Esportazione principale con Suspense
 export default function AuthPage() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center font-bold text-stone-300 uppercase tracking-widest animate-pulse">SoulBook...</div>}>

@@ -72,13 +72,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* --- FOOTER --- */}
-      <footer className="py-20 border-t border-slate-100 text-center space-y-8">
-        <div className="text-sm font-serif italic text-slate-400">SoulBook &mdash; Forever in our hearts.</div>
-        <div className="text-[8px] font-black uppercase tracking-[0.5em] text-slate-300">
-          &copy; 2026 SoulBook Digital Services
-        </div>
-      </footer>
+  
     </div>
   );
 }

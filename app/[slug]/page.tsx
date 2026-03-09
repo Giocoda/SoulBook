@@ -2,6 +2,9 @@
 
 import { useEffect, useState, use, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import Link from 'next/link';
+
+
 
 // --- COMPONENTE GUEST FORM ---
 function GuestMessageForm({ profile, onMessageSent }: { profile: any, onMessageSent: () => void }) {
@@ -78,25 +81,61 @@ export default function PublicProfile({ params }: { params: Promise<{ slug: stri
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchPublicData = async () => {
-    const { data: profileData } = await supabase.from('profiles').select('*').eq('slug', slug).single();
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('slug', slug)
+      .single();
+
+    // --- PROTEZIONE DI SICUREZZA ---
+    // Se il profilo è un Admin, non deve avere una pagina pubblica. 
+    // Impediamo il caricamento e mostriamo "Profilo non trovato".
+    if (profileData && profileData.is_admin === true) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
+
     if (profileData) {
       setProfile(profileData);
-      const { data: items } = await supabase.from('gallery_items').select('*').eq('owner_id', profileData.owner_id).order('position', { ascending: true });
-      if (items) setGallery(items);
-      const { data: msgData } = await supabase.from('messages').select('*').eq('profile_id', profileData.id).eq('is_public', true).order('created_at', { ascending: false });
-      if (msgData) setMessages(msgData);
+      
+      // Carichiamo gallery e messaggi solo se il profilo è pubblicato
+      if (profileData.is_published !== false) {
+        const { data: items } = await supabase
+          .from('gallery_items')
+          .select('*')
+          .eq('owner_id', profileData.owner_id)
+          .order('position', { ascending: true });
+        
+        if (items) setGallery(items);
+
+        const { data: msgData } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('profile_id', profileData.id)
+          .eq('is_public', true)
+          .order('created_at', { ascending: false });
+          
+        if (msgData) setMessages(msgData);
+      }
     }
     setLoading(false);
   };
 
-  useEffect(() => { if (slug) fetchPublicData(); }, [slug]);
+  useEffect(() => { 
+    if (slug) fetchPublicData(); 
+  }, [slug]);
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
-    return new Date(dateStr).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+    return new Date(dateStr).toLocaleDateString('it-IT', { 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    });
   };
 
-  // --- LOGICA VIDEO FUNZIONANTE ---
+  // --- LOGICA VIDEO ---
   const VideoPlayer = ({ url }: { url: string }) => {
     if (!url) return null;
     const cleanUrl = url.trim();
@@ -115,8 +154,71 @@ export default function PublicProfile({ params }: { params: Promise<{ slug: stri
     return <video src={cleanUrl} controls className="w-full h-full aspect-video object-cover" />;
   };
 
-  if (loading || !profile) return <div className="min-h-screen flex items-center justify-center font-black text-[10px] uppercase tracking-[0.5em] text-slate-300">In Memoria...</div>;
+  // --- LOADING STATE ---
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-[10px] uppercase tracking-[0.5em] text-slate-300">In Memoria...</div>;
 
+  // --- PAGINA NON TROVATA ---
+  if (!profile) return <div className="min-h-screen flex items-center justify-center font-serif italic text-slate-400">Profilo non trovato.</div>;
+
+  // --- INTEGRAZIONE BLOCCO MODERAZIONE (PAGINA INTERA - LAYOUT BIANCO) ---
+  if (profile.is_published === false) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-white flex flex-col justify-between text-center animate-in fade-in duration-1000">
+        
+        {/* Header Istituzionale (Logo) */}
+        <header className="w-full">
+          <nav className="flex justify-between items-center px-8 py-10 max-w-7xl mx-auto">
+            <div className="text-xl font-black uppercase tracking-[0.3em] italic text-slate-800">
+              Soul<span className="opacity-30">Book</span>
+            </div>
+          </nav>
+        </header>
+
+        {/* Messaggio Centrale */}
+        <div className="flex-grow flex flex-col justify-center items-center px-8">
+          <div className="space-y-6">
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 max-w-xs leading-relaxed mx-auto">
+              Questa pagina è momentaneamente sospesa <br/> o in fase di revisione.
+            </p>
+          </div>
+        </div>
+
+        {/* Footer Bianco (dal tuo Layout.tsx) */}
+        <footer className="w-full pb-12 px-6">
+          <div className="max-w-4xl mx-auto space-y-12">
+            
+            {/* Prefooter personalizzato per l'utente */}
+            <div className="space-y-6">
+              <div className="w-12 h-[0.5px] bg-slate-200 mx-auto opacity-50"></div>
+              <p className="text-[10px] md:text-[12px] font-black uppercase tracking-[0.8em] leading-loose text-slate-400">
+                SoulBook di <br className="md:hidden" /> {profile.full_name}
+              </p>
+              <div className="w-12 h-[0.5px] bg-slate-200 mx-auto opacity-50"></div>
+            </div>
+
+            {/* Crediti Istituzionali Bianchi */}
+            <div className="space-y-6">
+              <div className="text-sm font-serif italic text-slate-400">
+                SoulBook &mdash; Custodisci la tua storia.
+              </div>
+              
+              <div className="space-y-3">
+                <div className="text-[8px] font-black uppercase tracking-[0.5em] text-slate-300 leading-relaxed">
+                  © 2026 SOULBOOK DIGITAL SERVICES — PROPRIETÀ DI GIOVANNI CODA MER
+                </div>
+                <div className="flex justify-center gap-6 text-[8px] font-black uppercase tracking-[0.5em] text-slate-300">
+                  <Link href="/privacy" className="hover:text-slate-900 transition-colors">PRIVACY & COOKIE POLICY</Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </footer>
+      </div>
+    );
+
+  }
+
+  // --- LOGICA RENDERING NORMALE ---
   const images = gallery.filter(i => i.type === 'image');
   const videos = gallery.filter(i => i.type !== 'image');
   const fontClass = profile.font_family === 'serif' ? 'font-serif' : profile.font_family === 'mono' ? 'font-mono' : 'font-sans';
@@ -173,9 +275,7 @@ export default function PublicProfile({ params }: { params: Promise<{ slug: stri
                   <GuestMessageForm profile={profile} onMessageSent={fetchPublicData} />
                 </div>
                 <div className="relative max-w-2xl mx-auto mt-12">
-                  {/* SFUMATURA SUPERIORE MESSAGGI */}
                   <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-[var(--bg-color)] to-transparent z-10 pointer-events-none" style={{ '--bg-color': profile.page_bg_color } as any}></div>
-                  
                   <div className="max-h-[600px] overflow-y-auto no-scrollbar px-4 py-16 space-y-10 relative scroll-smooth">
                     {messages.map((msg, i) => (
                         <div key={i} className="animate-in fade-in duration-500 p-6 md:p-10 border border-slate-100 bg-white/30 backdrop-blur-sm relative group transition-all text-left">
@@ -192,8 +292,6 @@ export default function PublicProfile({ params }: { params: Promise<{ slug: stri
                         </div>
                     ))}
                   </div>
-
-                  {/* SFUMATURA INFERIORE MESSAGGI (IL FINE DELLE MEMORIE) */}
                   <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[var(--bg-color)] to-transparent z-10 pointer-events-none" style={{ '--bg-color': profile.page_bg_color } as any}></div>
                 </div>
               </section>
@@ -228,7 +326,6 @@ export default function PublicProfile({ params }: { params: Promise<{ slug: stri
                   ))}
                 </div>
 
-                {/* NAVIGABILITÀ DESKTOP (RIPRISTINATA) */}
                 <button onClick={() => scrollRef.current?.scrollBy({ left: -500, behavior: 'smooth' })} className="hidden md:flex absolute left-[-60px] top-1/2 -translate-y-1/2 w-12 h-12 items-center justify-center text-3xl font-thin text-slate-300 hover:text-slate-900 transition-all">‹</button>
                 <button onClick={() => scrollRef.current?.scrollBy({ left: 500, behavior: 'smooth' })} className="hidden md:flex absolute right-[-60px] top-1/2 -translate-y-1/2 w-12 h-12 items-center justify-center text-3xl font-thin text-slate-300 hover:text-slate-900 transition-all">›</button>
               </div>
