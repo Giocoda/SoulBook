@@ -9,20 +9,29 @@ function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const mode = searchParams.get('mode');
-  const [isLogin, setIsLogin] = useState(mode !== 'signup');
+  // Controlliamo se l'utente arriva dalla Home con ?mode=login
+  const isLoginFromUrl = searchParams.get('mode') === 'login';
   
+  const [mode, setMode] = useState<'login' | 'signup'>(isLoginFromUrl ? 'login' : 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [slug, setSlug] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [activeCode, setActiveCode] = useState<string | null>(null);
 
   useEffect(() => {
-    if (mode === 'signup') setIsLogin(false);
-    if (mode === 'login') setIsLogin(true);
-  }, [mode]);
+    // Se siamo in modalità registrazione, serve il codice
+    if (mode === 'signup') {
+      const savedCode = localStorage.getItem('soulbook_activation_code');
+      if (savedCode) {
+        setActiveCode(savedCode);
+      } else {
+        router.push('/attiva');
+      }
+    }
+  }, [mode, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,25 +39,8 @@ function AuthContent() {
     setErrorMsg(null);
 
     try {
-      if (isLogin) {
-        // 1. Eseguiamo il login
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw new Error("Email o password errati.");
-        
-        if (data.session) {
-          // 2. Registriamo la sessione nei cookie (lato client)
-          await supabase.auth.setSession({
-            access_token: data.session.access_token,
-            refresh_token: data.session.refresh_token,
-          });
-
-          // 3. MODIFICA CRUCIALE PER SAFARI: Hard Redirect
-          // Usiamo window.location invece di router.push per forzare il Proxy a leggere i nuovi cookie
-          window.location.href = '/dashboard?verified=true';
-        }
-        
-      } else {
-        // --- LOGICA DI REGISTRAZIONE ---
+      if (mode === 'signup') {
+        // --- 1. LOGICA REGISTRAZIONE (Tuo codice originale) ---
         const { data: authData, error: authError } = await supabase.auth.signUp({ 
           email, 
           password,
@@ -56,118 +48,130 @@ function AuthContent() {
         });
 
         if (authError) throw authError;
-
-        if (authData.user) {
-          // Aggiorniamo il profilo appena creato
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .update({ 
-              full_name: fullName,
-              slug: slug.toLowerCase().trim().replace(/\s+/g, '-'),
-              bio: "Benvenuti nel mio spazio dei ricordi.",
-              updated_at: new Date().toISOString(),
-            })
-            .eq('owner_id', authData.user.id);
-
-          if (profileError) throw profileError;
-          
-          // Anche qui, hard redirect dopo la registrazione
-          window.location.href = '/dashboard?verified=true';
+        if (!authData.user || !authData.session) {
+          setErrorMsg("Controlla la mail per confermare l'account.");
+          setLoading(false);
+          return;
         }
+
+        await supabase.auth.setSession(authData.session);
+
+        let agencyIdToLink = null;
+        let partnerNameToLink = null;
+        const cleanCode = activeCode?.toUpperCase().trim();
+
+        if (cleanCode) {
+          const { data: codeData } = await supabase
+            .from('activation_codes')
+            .select('agency_id, agencies(name)')
+            .eq('code', cleanCode)
+            .single();
+          
+          if (codeData) {
+            agencyIdToLink = codeData.agency_id;
+            partnerNameToLink = (codeData.agencies as any)?.name || 'Partner';
+
+            await supabase
+              .from('activation_codes')
+              .update({ 
+                is_used: true, 
+                activated_at: new Date().toISOString(), 
+                profile_id: authData.user.id 
+              })
+              .eq('code', cleanCode);
+          }
+        }
+
+        const finalSlug = slug ? slug.toLowerCase().trim().replace(/\s+/g, '-') : authData.user.id;
+        
+        const { error: insertError } = await supabase.from('profiles').insert({
+          owner_id: authData.user.id,
+          full_name: fullName,
+          slug: finalSlug,
+          agency_id: agencyIdToLink,
+          partner_name: partnerNameToLink,
+          used_code: cleanCode,
+          updated_at: new Date().toISOString(),
+        });
+
+        if (insertError) {
+          await supabase.from('profiles').update({
+            full_name: fullName,
+            slug: finalSlug,
+            agency_id: agencyIdToLink,
+            partner_name: partnerNameToLink,
+            used_code: cleanCode
+          }).eq('owner_id', authData.user.id);
+        }
+        
+        localStorage.removeItem('soulbook_activation_code');
+        window.location.href = '/dashboard?verified=true';
+
+      } else {
+        // --- 2. LOGICA LOGIN (Nuova) ---
+        const { error: loginError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (loginError) throw loginError;
+        router.push('/dashboard');
       }
+
     } catch (err: any) {
-      setErrorMsg(err.message || "Si è verificato un errore imprevisto.");
+      setErrorMsg(err.message);
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
-      <header className="w-full px-8 py-6 max-w-7xl mx-auto flex justify-start">
-        <Link 
-          href="/" 
-          className="text-xl font-black uppercase tracking-[0.3em] italic text-slate-800 hover:opacity-70 transition-opacity"
-        >
-          Soul<span className="opacity-30">Book</span>
+    <div className="min-h-screen bg-white flex flex-col font-sans text-slate-900">
+      <header className="w-full px-8 py-8 max-w-7xl mx-auto flex justify-center">
+        <Link href="/" className="text-2xl font-black uppercase tracking-tighter italic text-slate-900">
+          Soul<span className="text-slate-300">Book</span>
         </Link>
       </header>
-
       <div className="flex-grow flex flex-col justify-center pb-20 px-4">
-        <div className="max-w-md w-full mx-auto bg-white rounded-3xl shadow-xl border border-gray-100 p-10">
-          
+        <div className="max-w-md w-full mx-auto">
           <div className="text-center mb-10">
-            <div className="inline-block px-3 py-1 bg-slate-100 rounded-full mb-4">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">SoulBook</span>
-            </div>
-            <h2 className="text-3xl font-black text-gray-900 tracking-tight uppercase">
-              {isLogin ? 'Bentornato' : 'Crea Account'}
+            {mode === 'signup' && activeCode && (
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-full mb-6 shadow-xl shadow-slate-200">
+                <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
+                <span className="text-[10px] font-black uppercase tracking-widest italic">Key Attiva: {activeCode}</span>
+              </div>
+            )}
+            <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
+              {mode === 'signup' ? 'Crea Account' : 'Accedi'}
             </h2>
-            <p className="text-gray-400 mt-2 text-sm font-medium">
-              {isLogin ? 'Gestisci il tuo SoulBook' : 'Inizia a custodire i tuoi ricordi'}
-            </p>
           </div>
 
-          {errorMsg && (
-            <div className="mb-6 p-4 bg-red-50 text-red-700 text-xs font-bold rounded-xl border border-red-100">
-              {errorMsg}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {!isLogin && (
+          {errorMsg && <div className="mb-6 p-4 bg-red-50 text-red-600 text-[10px] font-black uppercase tracking-widest rounded-2xl border border-red-100">{errorMsg}</div>}
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === 'signup' && (
               <>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Nome Completo</label>
-                  <input 
-                    type="text" placeholder="Mario Rossi" required
-                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-slate-900 outline-none text-gray-900 font-medium transition-all"
-                    value={fullName} onChange={(e) => setFullName(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Slug (URL personalizzato)</label>
-                  <input 
-                    type="text" placeholder="es: alessandro-riva" required
-                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-slate-900 outline-none text-gray-900 font-medium transition-all"
-                    value={slug} onChange={(e) => setSlug(e.target.value)}
-                  />
-                </div>
+                <input type="text" placeholder="Nome e Cognome" required className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:border-slate-900 outline-none font-bold text-slate-900" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                <input type="text" placeholder="Slug URL (mario-rossi)" required className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:border-slate-900 outline-none font-bold text-slate-900" value={slug} onChange={(e) => setSlug(e.target.value)} />
               </>
             )}
-
-            <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Email</label>
-              <input 
-                type="email" placeholder="nome@esempio.it" required
-                className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-slate-900 outline-none text-gray-900 font-medium transition-all"
-                value={email} onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Password</label>
-              <input 
-                type="password" placeholder="••••••••" required
-                className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-slate-900 outline-none text-gray-900 font-medium transition-all"
-                value={password} onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
+            <input type="email" placeholder="Email" required className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:border-slate-900 outline-none font-bold text-slate-900" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input type="password" placeholder="Password" required className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:border-slate-900 outline-none font-bold text-slate-900" value={password} onChange={(e) => setPassword(e.target.value)} />
             
-            <button 
-              disabled={loading}
-              className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] hover:bg-black transition-all shadow-lg shadow-slate-200 disabled:bg-gray-300 mt-6"
-            >
-              {loading ? 'Elaborazione...' : (isLogin ? 'Accedi' : 'Registrati')}
+            <button disabled={loading} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] hover:bg-blue-600 transition-all shadow-xl shadow-slate-100 disabled:bg-slate-100 mt-6">
+              {loading ? 'Elaborazione...' : mode === 'signup' ? 'Registrati e Attiva' : 'Entra nella Dashboard'}
             </button>
           </form>
 
-          <div className="mt-10 pt-8 border-t border-gray-50 text-center">
+          {/* Tasto per switchare */}
+          <div className="mt-8 text-center">
             <button 
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors"
+              onClick={() => {
+                setMode(mode === 'signup' ? 'login' : 'signup');
+                setErrorMsg(null);
+              }}
+              className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-all"
             >
-              {isLogin ? "Nuovo utente? Registrati qui" : "Hai già un account? Accedi"}
+              {mode === 'signup' ? 'Hai già un account? Accedi' : 'Nuovo utente? Registrati'}
             </button>
           </div>
         </div>
@@ -178,7 +182,7 @@ function AuthContent() {
 
 export default function AuthPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center font-bold text-stone-300 uppercase tracking-widest animate-pulse">SoulBook...</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center font-black text-slate-200 uppercase tracking-[0.5em] animate-pulse italic">SoulBook</div>}>
       <AuthContent />
     </Suspense>
   );

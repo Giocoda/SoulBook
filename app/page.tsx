@@ -39,7 +39,7 @@ export default function HomePage() {
             href="/registrati?mode=signup" 
             className="w-full sm:w-auto bg-slate-900 text-white px-12 py-5 rounded-full font-black uppercase text-[10px] tracking-[0.2em] hover:scale-105 transition-transform shadow-2xl shadow-slate-200"
           >
-            Crea Profilo
+            Attiva Profilo
           </Link>
           
           <p className="text-[9px] uppercase tracking-widest text-slate-300 font-bold px-4">Oppure</p>
@@ -54,23 +54,90 @@ export default function HomePage() {
       </header>
 
       {/* --- IL PROCESSO (3 STEP) --- */}
-      <section className="bg-white py-32 border-y border-slate-100">
-        <div className="max-w-6xl mx-auto px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-16">
-            {[
-              { t: '01', title: 'Crea', desc: 'Scegli un URL personalizzato e inserisci le informazioni base.' },
-              { t: '02', title: 'Personalizza', desc: 'Carica foto, video e scegli i colori che meglio raccontano la sua anima.' },
-              { t: '03', title: 'Condividi', desc: 'Ricevi un QR Code unico da apporre in luoghi fisici o condividere privatamente.' }
-            ].map((step, i) => (
-              <div key={i} className="space-y-4">
-                <span className="text-4xl font-serif italic text-slate-200">{step.t}</span>
-                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900">{step.title}</h3>
-                <p className="text-sm text-slate-500 leading-relaxed font-light">{step.desc}</p>
+<section className="bg-white py-32 border-y border-slate-100 overflow-hidden">
+  <div className="max-w-6xl mx-auto px-8">
+    
+    {/* Titolo Sezione */}
+    <div className="mb-24">
+      <h2 className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-400 mb-4 flex items-center gap-3">
+        <span className="w-8 h-[1px] bg-slate-200"></span>
+        Soulbook - 
+      </h2>
+      <p className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
+        Tre passi per l'eternità.
+      </p>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-12 lg:gap-20">
+      {[
+        { 
+          num: '01', 
+          title: 'Ottieni la Key', 
+          desc: 'Richiedi la tua card di attivazione fisica da un nostro partner autorizzato o direttamente a Soulbook.',
+          // Icona Card / Key
+          svg: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6"><rect x="3" y="5" width="18" height="14" rx="3"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="15" x2="12" y2="15"/></svg>
+        },
+        { 
+          num: '02', 
+          title: 'Attiva il Profilo', 
+          desc: 'Inserisci il codice unico per sbloccare il tuo spazio digitale e scegliere il tuo URL personalizzato.',
+          // Icona Check/Shield
+          svg: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6"><path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/><polyline points="9 12 11 14 15 10"/></svg>
+        },
+        { 
+          num: '03', 
+          title: 'Crea & Condividi', 
+          desc: 'Personalizza la storia con foto e video. Ottieni il QR Code unico da apporre nel luogo del ricordo. Raccogli dediche e pensieri.',
+          // Icona Share/QR
+          svg: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M7 7h.01M17 7h.01M17 17h.01M7 17h.01"/></svg>
+        }
+      ].map((step, i) => (
+        <div key={i} className="group relative">
+          {/* Numero Sfondo Decorativo - Sfumato e minimale */}
+          <div className="absolute -top-10 -left-4 text-8xl font-black text-slate-100 opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none italic">
+            {step.num}
+          </div>
+
+          <div className="relative space-y-8">
+            {/* Icona Tecnica */}
+            <div className="w-14 h-14 bg-white border border-slate-200 text-slate-900 rounded-2xl flex items-center justify-center shadow-sm group-hover:border-slate-900 transition-all duration-300">
+              {step.svg}
+            </div>
+
+            {/* Testo */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-300">
+                  Passo {step.num}
+                </span>
               </div>
-            ))}
+              <h3 className="text-xl font-black uppercase italic tracking-tight text-slate-900">
+                {step.title}
+              </h3>
+              <div className="w-6 h-[2px] bg-slate-900 group-hover:w-12 transition-all duration-500"></div>
+              <p className="text-sm text-slate-500 leading-relaxed font-medium">
+                {step.desc}
+              </p>
+            </div>
           </div>
         </div>
-      </section>
+      ))}
+    </div>
+
+    {/* CTA Finale */}
+    <div className="mt-24 pt-12 border-t border-slate-50 flex flex-col md:flex-row items-center justify-between gap-8">
+      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-300 italic">
+        La memoria è un tesoro che va custodito con cura.
+      </p>
+      <Link 
+        href="/attiva" 
+        className="px-10 py-5 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-[0.3em] hover:bg-slate-800 transition-all shadow-xl shadow-slate-100"
+      >
+        Inizia ora &rarr;
+      </Link>
+    </div>
+  </div>
+</section>
 
   
     </div>

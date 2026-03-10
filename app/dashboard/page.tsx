@@ -45,6 +45,7 @@ const compressImage = (file: File): Promise<File> => {
 
 export default function Dashboard() {
   const [profile, setProfile] = useState<any>(null);
+  const [agency, setAgency] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'content' | 'messages'>('content');
   
@@ -73,8 +74,9 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push('/registrati'); return; }
+    if (!user) { router.push('/login'); return; }
 
+    // Carichiamo il profilo (usando owner_id)
     const { data: profileData } = await supabase
       .from('profiles')
       .select('*')
@@ -91,6 +93,16 @@ export default function Dashboard() {
       setAccentColor(profileData.accent_color || '#4A4440');
       setFontFamily(profileData.font_family || 'sans');
       setPageBgColor(profileData.page_bg_color || '#ffffff');
+
+      // Se c'è un'agenzia collegata, la carichiamo
+      if (profileData.agency_id) {
+        const { data: agencyData } = await supabase
+          .from('agencies')
+          .select('*')
+          .eq('id', profileData.agency_id)
+          .single();
+        if (agencyData) setAgency(agencyData);
+      }
 
       const { data: msgData } = await supabase
         .from('messages')
@@ -239,17 +251,34 @@ export default function Dashboard() {
             <h1 className="font-bold uppercase text-lg tracking-wider text-stone-800">
               Soulbook <span className="font-light text-stone-400">Admin</span>
             </h1>
-            <button onClick={() => supabase.auth.signOut().then(() => router.push('/registrati'))} className="md:hidden px-4 py-2 bg-red-50 text-red-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-red-100">Esci</button>
+            <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="md:hidden px-4 py-2 bg-red-50 text-red-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-red-100">Esci</button>
           </div>
           <div className="flex bg-stone-100 p-1 rounded-xl gap-1 w-full md:w-auto">
             <button onClick={() => setActiveTab('content')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'content' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-400'}`}>Contenuti</button>
             <button onClick={() => setActiveTab('messages')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'messages' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-400'}`}>Messaggi ({messages.length})</button>
           </div>
-          <button onClick={() => supabase.auth.signOut().then(() => router.push('/registrati'))} className="hidden md:block px-5 py-2.5 bg-stone-50 text-stone-400 hover:text-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest">Esci</button>
+          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="hidden md:block px-5 py-2.5 bg-stone-50 text-stone-400 hover:text-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest">Esci</button>
         </div>
       </nav>
 
       <div className="max-w-5xl mx-auto p-6 space-y-8 mt-4">
+        
+        {/* BADGE AGENZIA PARTNER (SE PRESENTE) */}
+        {agency && (
+          <div className="bg-stone-800 text-white p-4 rounded-2xl flex items-center justify-between shadow-xl animate-in fade-in slide-in-from-top-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/10 p-2 rounded-lg">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0z"></path></svg>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-stone-400">Partner Autorizzato</span>
+                <span className="text-sm font-black uppercase tracking-tight italic">{agency.name}</span>
+              </div>
+            </div>
+            {agency.logo_url && <img src={agency.logo_url} className="h-8 opacity-50 grayscale brightness-200" alt="Agency Logo" />}
+          </div>
+        )}
+
         {activeTab === 'content' ? (
           <div className="space-y-8 animate-in fade-in duration-500">
             {/* INTESTAZIONE: PROFILO + QR CODE */}
@@ -257,7 +286,7 @@ export default function Dashboard() {
               <div className="md:col-span-2 bg-white p-8 rounded-2xl shadow-sm border border-stone-100 flex flex-col md:flex-row items-center gap-10">
                 <div className="relative group">
                   <img src={profile?.profile_image_url || 'https://via.placeholder.com/150'} className="w-36 h-36 rounded-xl object-cover border border-stone-50 shadow-md" alt="Profile" />
-                  <label className="absolute -bottom-2 -right-2 bg-stone-800 text-white p-2.5 rounded-lg cursor-pointer hover:bg-stone-600 shadow-lg">
+                  <label className="absolute -bottom-2 -right-2 bg-stone-800 text-white p-2.5 rounded-lg cursor-pointer hover:bg-stone-600 shadow-lg transition-all">
                     <input type="file" hidden accept="image/*" onChange={(e) => handleFileUpload(e, 'avatars')} />
                     <span className="text-[10px] font-bold uppercase">Foto</span>
                   </label>
@@ -273,7 +302,7 @@ export default function Dashboard() {
                       <label className="text-[9px] font-bold uppercase text-stone-400 ml-1">Morte</label>
                       <div className="flex gap-2">
                         <input type="date" value={deathDate} onChange={(e) => setDeathDate(e.target.value)} className="bg-stone-50 p-2 rounded-lg text-xs font-bold outline-none border border-stone-100 h-[38px]" />
-                        <button type="button" onClick={() => setDeathDate('')} style={{ backgroundColor: `${profile.accent_color}15`, color: profile.accent_color, borderColor: `${profile.accent_color}40` }} className="px-3 h-[38px] rounded-lg text-[8px] font-black uppercase border tracking-widest hover:opacity-70 transition-all">∞ Sempre</button>
+                        <button type="button" onClick={() => setDeathDate('')} style={{ backgroundColor: `${accentColor}15`, color: accentColor, borderColor: `${accentColor}40` }} className="px-3 h-[38px] rounded-lg text-[8px] font-black uppercase border tracking-widest hover:opacity-70 transition-all">∞ Sempre</button>
                       </div>
                     </div>
                   </div>
@@ -284,7 +313,7 @@ export default function Dashboard() {
                   {qrValue && <QRCode value={qrValue} size={110} fgColor="#44403c" />}
                 </div>
                 <div className="flex flex-col items-center gap-2">
-                  <p className="text-[9px] font-bold uppercase text-stone-300 tracking-widest">QR Code</p>
+                  <p className="text-[9px] font-bold uppercase text-stone-300 tracking-widest">QR Code Profilo</p>
                   <button onClick={downloadQRCode} className="px-3 py-1.5 bg-stone-50 hover:bg-stone-100 text-stone-500 text-[9px] font-black uppercase tracking-tighter rounded-lg border border-stone-100 transition-all flex items-center gap-2">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                     Scarica PNG
@@ -293,7 +322,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* ESTETICA E STORIA */}
+            {/* ESTETICA */}
             <div className="bg-white p-10 rounded-2xl shadow-sm border border-stone-100 space-y-8">
               <h3 className="text-xl font-bold uppercase tracking-wide text-stone-700">Impostazioni Estetiche</h3>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -315,7 +344,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="md:col-span-2 space-y-3">
-                    <label className="text-[10px] font-bold uppercase text-stone-400 ml-1">Font</label>
+                    <label className="text-[10px] font-bold uppercase text-stone-400 ml-1">Font del Memoriale</label>
                     <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="w-full h-[54px] bg-stone-50 border border-stone-100 rounded-xl px-4 text-xs font-bold outline-none cursor-pointer">
                       <option value="sans">Moderno Pulito (Sans)</option>
                       <option value="serif">Elegante Classico (Serif)</option>
@@ -332,7 +361,7 @@ export default function Dashboard() {
               <textarea className="w-full h-40 p-6 bg-stone-50 border border-stone-100 rounded-xl text-stone-600 font-medium outline-none resize-none" placeholder="Scrivi qui i momenti più belli..." value={bioContent} onChange={(e) => setBioContent(e.target.value)} />
             </div>
 
-            {/* GALLERIA CON SPOSTA, DROP E SEPARATORI */}
+            {/* GALLERIA */}
             <div 
               className="bg-white p-10 rounded-2xl shadow-sm border border-stone-100 transition-all"
               onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-stone-400', 'bg-stone-50'); }}
@@ -345,71 +374,62 @@ export default function Dashboard() {
             >
               <div className="flex justify-between items-center mb-10">
                 <div className="space-y-1">
-                  <h3 className="text-xl font-bold uppercase tracking-wide text-stone-700">Galleria</h3>
-                  <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest">Racconta la storia con Titoli e fotografie. Trascina foto e titoli per ordinarli.</p>
+                  <h3 className="text-xl font-bold uppercase tracking-wide text-stone-700">Galleria Fotografica</h3>
+                  <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest">Organizza la storia. Trascina le immagini per ordinarle.</p>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={addSeparator} className="px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase border border-stone-200 text-stone-500 hover:bg-stone-50 transition-all">+ Titolo Sezione</button>
                   <label className="bg-stone-800 text-white px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase hover:bg-stone-600 cursor-pointer shadow-md transition-all">
-                    + Aggiungi Foto <input type="file" hidden multiple accept="image/*" onChange={(e) => handleFileUpload(e, 'gallery')} />
+                    + Foto <input type="file" hidden multiple accept="image/*" onChange={(e) => handleFileUpload(e, 'gallery')} />
                   </label>
                 </div>
               </div>
 
-              {/* GRIGLIA PIÙ COMPATTA: 3 colonne su mobile, 6 su desktop */}
-<div className="grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-4">
-  {galleryItems
-    .filter(i => i.type === 'image' || i.type === 'separator') // Filtro stretto qui
-    .sort((a, b) => (a.position || 0) - (b.position || 0))
-    .map((item) => (
-      item.type === 'separator' ? (
-        /* IL SEPARATORE ORA OCCUPA TUTTA LA RIGA (6 colonne) */
-        <div key={item.id} draggable
-          className="col-span-3 md:col-span-6 py-4 flex items-center gap-4 group cursor-move"
-          /* ... (mantieni gli eventi onDrag/onDrop del separatore) ... */
-        >
-          <div className="h-[1px] flex-1 bg-stone-100"></div>
-          <span className="text-[9px] font-black uppercase tracking-[0.2em] text-stone-400 bg-stone-50 px-4 py-1.5 rounded-full border border-stone-100 italic">
-            {item.url}
-          </span>
-          <div className="h-[1px] flex-1 bg-stone-100"></div>
-          <button onClick={() => deleteItem(item)} className="opacity-0 group-hover:opacity-100 text-stone-300 hover:text-red-500 transition-all text-xs">✕</button>
-        </div>
-      ) : (
-        /* ANTEPRIMA FOTO: Più piccola e con padding ridotto */
-        <div key={item.id} draggable
-          onDragStart={(e) => { e.dataTransfer.setData('text/plain', item.id); e.currentTarget.classList.add('opacity-40'); }}
-          onDragEnd={(e) => e.currentTarget.classList.remove('opacity-40')}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={async (e) => {
-              e.preventDefault(); e.stopPropagation();
-              const draggedId = e.dataTransfer.getData('text/plain');
-              if (!draggedId || draggedId === item.id) return;
-              const items = [...galleryItems];
-              const draggedIdx = items.findIndex(i => i.id === draggedId);
-              const targetIdx = items.findIndex(i => i.id === item.id);
-              const [reorderedItem] = items.splice(draggedIdx, 1);
-              items.splice(targetIdx, 0, reorderedItem);
-              const updatedItems = items.map((img, index) => ({ ...img, position: index }));
-              setGalleryItems(updatedItems);
-              await supabase.from('gallery_items').upsert(updatedItems.map(img => ({ id: img.id, position: img.position, owner_id: img.owner_id, url: img.url, type: img.type })));
-          }}
-          className="group relative aspect-square rounded-lg overflow-hidden border border-stone-100 shadow-sm cursor-move bg-stone-50 transition-all active:scale-95"
-        >
-          <img src={item.url} className="w-full h-full object-cover pointer-events-none select-none" alt="" />
-          <div className="absolute inset-0 bg-stone-900/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-            <span className="bg-white/90 px-2 py-0.5 rounded-full text-[7px] font-bold uppercase text-stone-700 shadow-sm border border-stone-100">Sposta</span>
-          </div>
-          <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteItem(item); }} className="absolute top-1 right-1 bg-white/90 text-stone-400 w-6 h-6 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 hover:text-red-600 text-[10px] transition-all z-30">✕</button>
-        </div>
-      )
-    ))}
-</div>
+              <div className="grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-4">
+                {galleryItems
+                  .filter(i => i.type === 'image' || i.type === 'separator')
+                  .sort((a, b) => (a.position || 0) - (b.position || 0))
+                  .map((item) => (
+                    item.type === 'separator' ? (
+                      <div key={item.id} draggable className="col-span-3 md:col-span-6 py-4 flex items-center gap-4 group cursor-move">
+                        <div className="h-[1px] flex-1 bg-stone-100"></div>
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-stone-400 bg-stone-50 px-4 py-1.5 rounded-full border border-stone-100 italic">
+                          {item.url}
+                        </span>
+                        <div className="h-[1px] flex-1 bg-stone-100"></div>
+                        <button onClick={() => deleteItem(item)} className="opacity-0 group-hover:opacity-100 text-stone-300 hover:text-red-500 transition-all text-xs">✕</button>
+                      </div>
+                    ) : (
+                      <div key={item.id} draggable
+                        onDragStart={(e) => { e.dataTransfer.setData('text/plain', item.id); e.currentTarget.classList.add('opacity-40'); }}
+                        onDragEnd={(e) => e.currentTarget.classList.remove('opacity-40')}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={async (e) => {
+                            e.preventDefault(); e.stopPropagation();
+                            const draggedId = e.dataTransfer.getData('text/plain');
+                            if (!draggedId || draggedId === item.id) return;
+                            const items = [...galleryItems];
+                            const draggedIdx = items.findIndex(i => i.id === draggedId);
+                            const targetIdx = items.findIndex(i => i.id === item.id);
+                            const [reorderedItem] = items.splice(draggedIdx, 1);
+                            items.splice(targetIdx, 0, reorderedItem);
+                            const updatedItems = items.map((img, index) => ({ ...img, position: index }));
+                            setGalleryItems(updatedItems);
+                            await supabase.from('gallery_items').upsert(updatedItems.map(img => ({ id: img.id, position: img.position, owner_id: img.owner_id, url: img.url, type: img.type })));
+                        }}
+                        className="group relative aspect-square rounded-lg overflow-hidden border border-stone-100 shadow-sm cursor-move bg-stone-50 transition-all active:scale-95"
+                      >
+                        <img src={item.url} className="w-full h-full object-cover pointer-events-none select-none" alt="" />
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteItem(item); }} className="absolute top-1 right-1 bg-white/90 text-stone-400 w-6 h-6 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 hover:text-red-600 text-[10px] transition-all z-30 shadow-sm">✕</button>
+                      </div>
+                    )
+                  ))}
+              </div>
             </div>
 
             {/* VIDEO */}
             <div className="bg-white p-10 rounded-2xl shadow-sm border border-stone-100">
-              <h3 className="text-xl font-bold uppercase tracking-wide text-stone-700 mb-10">Video</h3>
+              <h3 className="text-xl font-bold uppercase tracking-wide text-stone-700 mb-10">Video e Ricordi Multimediali</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {galleryItems.filter(i => i.type === 'video' || i.type === 'video_file').map((item, i) => (
                   <div key={i} className="group relative aspect-video rounded-xl overflow-hidden bg-stone-900 shadow-xl">
@@ -418,14 +438,14 @@ export default function Dashboard() {
                   </div>
                 ))}
                 <div className="aspect-video rounded-xl border-2 border-dashed border-stone-100 bg-stone-50 flex flex-col items-center justify-center p-8 space-y-4">
-                  <input type="text" placeholder="YouTube, Vimeo o TikTok Link..." value={newVideoUrl} onChange={(e) => setNewVideoUrl(e.target.value)} className="w-full p-3 bg-white rounded-lg border border-stone-200 text-xs outline-none" />
+                  <input type="text" placeholder="Link YouTube, Vimeo o TikTok..." value={newVideoUrl} onChange={(e) => setNewVideoUrl(e.target.value)} className="w-full p-3 bg-white rounded-lg border border-stone-200 text-xs outline-none" />
                   <div className="flex gap-2 w-full">
                     <button onClick={async () => {
                         if (!newVideoUrl.trim()) return;
                         await supabase.from('gallery_items').insert({ owner_id: profile.owner_id, url: newVideoUrl.trim(), type: 'video', position: galleryItems.length });
                         setNewVideoUrl(''); fetchData();
                     }} className="flex-1 bg-stone-800 text-white py-3 rounded-lg text-[10px] font-bold uppercase">Salva Link</button>
-                    <label className="flex-1 bg-stone-200 text-stone-600 py-3 rounded-lg text-[10px] font-bold uppercase cursor-pointer text-center">Carica File <input type="file" hidden accept="video/*" onChange={(e) => handleFileUpload(e, 'videos')} /></label>
+                    <label className="flex-1 bg-stone-200 text-stone-600 py-3 rounded-lg text-[10px] font-bold uppercase cursor-pointer text-center">Carica Video <input type="file" hidden accept="video/*" onChange={(e) => handleFileUpload(e, 'videos')} /></label>
                   </div>
                 </div>
               </div>
@@ -439,7 +459,7 @@ export default function Dashboard() {
               <div className="space-y-6">
                 <div className="flex items-center gap-2 px-2 text-stone-400">
                   <span className="w-2 h-2 bg-stone-200 rounded-full"></span>
-                  <h4 className="text-[10px] font-bold uppercase tracking-widest">Privati</h4>
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest">Privati (Visibili solo a te)</h4>
                 </div>
                 <div className="space-y-4">
                   {messages.filter(m => !m.is_public).map((msg, i) => (
@@ -456,8 +476,8 @@ export default function Dashboard() {
               </div>
               <div className="space-y-6">
                 <div className="flex items-center gap-2 px-2 text-stone-400">
-                  <span className="w-2 h-2 bg-green-200 rounded-full"></span>
-                  <h4 className="text-[10px] font-bold uppercase tracking-widest">Online</h4>
+                  <span className="w-2 h-2 bg-green-200 rounded-full animate-pulse"></span>
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest">Pubblici (Online)</h4>
                 </div>
                 <div className="space-y-4">
                   {messages.filter(m => m.is_public).map((msg, i) => (
@@ -481,12 +501,12 @@ export default function Dashboard() {
       <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-stone-200 p-4 z-[100] shadow-lg">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
           <div className="hidden md:flex items-center gap-2 text-stone-400">
-            <span className="text-[10px] font-bold uppercase tracking-widest italic">Personalizza il tuo spazio</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest italic">Tutte le modifiche sono istantanee</span>
           </div>
           <div className="flex gap-3 w-full md:w-auto">
-            <a href={`/${profile?.slug}`} target="_blank" className="flex-1 md:flex-none px-6 py-4 bg-stone-100 text-stone-600 rounded-xl text-[10px] font-bold uppercase hover:bg-stone-200 transition-all text-center">Anteprima</a>
+            <a href={`/${profile?.slug}`} target="_blank" className="flex-1 md:flex-none px-6 py-4 bg-stone-100 text-stone-600 rounded-xl text-[10px] font-bold uppercase hover:bg-stone-200 transition-all text-center">Visualizza Online</a>
             <button onClick={saveProfileData} disabled={isSaving} className="flex-[2] md:flex-none px-12 py-4 bg-stone-800 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-stone-900 shadow-md transition-all disabled:opacity-50">
-              {isSaving ? 'Salvataggio...' : 'Conferma e Pubblica'}
+              {isSaving ? 'Salvataggio...' : 'Salva Profilo'}
             </button>
           </div>
         </div>
