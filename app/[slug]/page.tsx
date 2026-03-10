@@ -81,58 +81,26 @@ export default function PublicProfile({ params }: { params: Promise<{ slug: stri
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchPublicData = async () => {
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('slug', slug)
-      .single();
-
-    // --- PROTEZIONE DI SICUREZZA ---
-    // Se il profilo è un Admin, non deve avere una pagina pubblica. 
-    // Impediamo il caricamento e mostriamo "Profilo non trovato".
-    if (profileData && profileData.is_admin === true) {
-      setProfile(null);
-      setLoading(false);
-      return;
-    }
-
+    const { data: profileData } = await supabase.from('profiles').select('*').eq('slug', slug).single();
     if (profileData) {
       setProfile(profileData);
       
       // Carichiamo gallery e messaggi solo se il profilo è pubblicato
       if (profileData.is_published !== false) {
-        const { data: items } = await supabase
-          .from('gallery_items')
-          .select('*')
-          .eq('owner_id', profileData.owner_id)
-          .order('position', { ascending: true });
-        
+        const { data: items } = await supabase.from('gallery_items').select('*').eq('owner_id', profileData.owner_id).order('position', { ascending: true });
         if (items) setGallery(items);
-
-        const { data: msgData } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('profile_id', profileData.id)
-          .eq('is_public', true)
-          .order('created_at', { ascending: false });
-          
+        const { data: msgData } = await supabase.from('messages').select('*').eq('profile_id', profileData.id).eq('is_public', true).order('created_at', { ascending: false });
         if (msgData) setMessages(msgData);
       }
     }
     setLoading(false);
   };
 
-  useEffect(() => { 
-    if (slug) fetchPublicData(); 
-  }, [slug]);
+  useEffect(() => { if (slug) fetchPublicData(); }, [slug]);
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
-    return new Date(dateStr).toLocaleDateString('it-IT', { 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric' 
-    });
+    return new Date(dateStr).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
   // --- LOGICA VIDEO ---
@@ -300,58 +268,98 @@ export default function PublicProfile({ params }: { params: Promise<{ slug: stri
 
           {activeTab === 'media' && (
             <div className="animate-in fade-in duration-700 space-y-24">
-              <div className="relative group">
+              
+              {/* --- SLIDER FOTO E SEPARATORI --- */}
+              <div className="relative group/slider">
                 <div className="flex items-center justify-between mb-8 px-4 md:px-0">
                   <span className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-600 italic">Memory Book</span>
                   <div className="h-[0.5px] flex-grow mx-8 bg-slate-200/50"></div>
-                  <span className="text-[9px] font-mono text-slate-500 uppercase">Immagini</span>
+                  <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">Immagini</span>
                 </div>
 
-                <div ref={scrollRef} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar gap-6 md:gap-12 pb-10 cursor-grab active:cursor-grabbing">
-                  {images.map((img, idx) => (
-                    <div key={idx} className="snap-center shrink-0 w-[85vw] md:w-[500px]">
-                      <div className="bg-white p-4 md:p-6 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.06)] border border-slate-100 relative group transition-transform duration-500 hover:scale-[1.01]">
-                        <div className="aspect-[4/5] relative border border-slate-200 p-2 md:p-3">
-                          <div className="absolute inset-1 border-[0.5px] opacity-30" style={{ borderColor: profile.accent_color }}></div>
-                          <div className="w-full h-full overflow-hidden bg-slate-50">
-                            <img src={img.url} className="w-full h-full object-cover" alt="" />
-                          </div>
-                        </div>
-                        <div className="mt-6 flex justify-between items-baseline px-1">
-                          <span className="text-[8px] font-black uppercase tracking-widest text-slate-600 italic">Memory Book</span>
-                          <span className="text-[9px] font-mono text-slate-400" style={{ color: profile.accent_color }}>{idx + 1} / {images.length}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <div className="relative">
+                  {/* Frecce Laterali (Solo Desktop) */}
+                  <button 
+                    onClick={() => scrollRef.current?.scrollBy({ left: -500, behavior: 'smooth' })} 
+                    className="hidden md:flex absolute left-[-70px] top-1/2 -translate-y-1/2 w-12 h-24 items-center justify-center text-4xl font-thin text-slate-300 hover:text-slate-900 transition-all opacity-0 group-hover/slider:opacity-100 z-30"
+                  >
+                    ‹
+                  </button>
+                  
+                  <button 
+                    onClick={() => scrollRef.current?.scrollBy({ left: 500, behavior: 'smooth' })} 
+                    className="hidden md:flex absolute right-[-70px] top-1/2 -translate-y-1/2 w-12 h-24 items-center justify-center text-4xl font-thin text-slate-300 hover:text-slate-900 transition-all opacity-0 group-hover/slider:opacity-100 z-30"
+                  >
+                    ›
+                  </button>
 
-                <button onClick={() => scrollRef.current?.scrollBy({ left: -500, behavior: 'smooth' })} className="hidden md:flex absolute left-[-60px] top-1/2 -translate-y-1/2 w-12 h-12 items-center justify-center text-3xl font-thin text-slate-300 hover:text-slate-900 transition-all">‹</button>
-                <button onClick={() => scrollRef.current?.scrollBy({ left: 500, behavior: 'smooth' })} className="hidden md:flex absolute right-[-60px] top-1/2 -translate-y-1/2 w-12 h-12 items-center justify-center text-3xl font-thin text-slate-300 hover:text-slate-900 transition-all">›</button>
+                  {/* Contenitore Scrollabile */}
+                  <div 
+                    ref={scrollRef} 
+                    className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar gap-6 md:gap-12 pb-10 cursor-grab active:cursor-grabbing"
+                  >
+                    {gallery
+                      .filter(i => i.type === 'image' || i.type === 'separator')
+                      .map((item, idx) => (
+                        <div key={idx} className="snap-center shrink-0 w-[85vw] md:w-[500px]">
+                          {item.type === 'separator' ? (
+                            /* RENDERING SEPARATORE (Pagina Libro) */
+                            <div className="bg-white p-6 md:p-10 shadow-sm border border-slate-100 h-full flex flex-col justify-center items-center text-center">
+                              <div className="aspect-[4/5] w-full flex flex-col justify-center items-center border-[0.5px] border-slate-100 p-8 space-y-6">
+                                <div className="w-8 h-[1px]" style={{ backgroundColor: profile.accent_color }}></div>
+                                <h3 className="text-2xl md:text-3xl font-serif italic tracking-tight leading-relaxed" style={{ color: profile.accent_color }}>
+                                  {item.url}
+                                </h3>
+                                <div className="w-8 h-[1px]" style={{ backgroundColor: profile.accent_color }}></div>
+                              </div>
+                            </div>
+                          ) : (
+                            /* RENDERING FOTO (Stile Polaroid) */
+                            <div className="bg-white p-4 md:p-6 shadow-sm border border-slate-100 relative group transition-transform duration-500 hover:scale-[1.01]">
+                              <div className="aspect-[4/5] relative border border-slate-200 p-2 md:p-3">
+                                <div className="absolute inset-1 border-[0.5px] opacity-10" style={{ borderColor: profile.accent_color }}></div>
+                                <div className="w-full h-full overflow-hidden bg-slate-50">
+                                  <img src={item.url} className="w-full h-full object-cover" alt="" />
+                                </div>
+                              </div>
+                              <div className="mt-6 flex justify-between items-baseline px-1 opacity-30">
+                                <span className="text-[8px] font-black uppercase tracking-widest text-slate-600">Memory Book</span>
+                                <span className="text-[9px] font-mono text-slate-400" style={{ color: profile.accent_color }}>{idx + 1}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
               </div>
 
-              {videos.length > 0 && (
-                <div className="space-y-12 pb-12">
-                   <div className="flex items-center justify-between mb-8 px-4 md:px-0">
+              {/* --- SEZIONE VIDEO (GRIGLIA A PARTE) --- */}
+              {gallery.filter(i => i.type === 'video' || i.type === 'video_file').length > 0 && (
+                <div className="space-y-12 pb-24 border-t border-slate-100 pt-20">
+                  <div className="flex items-center justify-between mb-8 px-4 md:px-0">
                     <span className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-600 italic">Memory Book</span>
                     <div className="h-[0.5px] flex-grow mx-8 bg-slate-200/50"></div>
-                    <span className="text-[9px] font-mono text-slate-500 uppercase">Pellicole</span>
+                    <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">Le Pellicole</span>
                   </div>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                      {videos.map((vid, i) => (
-                        <div key={i} className="bg-white p-4 md:p-6 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.06)] border border-slate-100 relative group transition-transform duration-500 hover:scale-[1.01]">
-                          <div className="aspect-video relative border border-slate-200 p-2">
-                            <div className="w-full h-full overflow-hidden bg-black rounded-sm">
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16">
+                    {gallery
+                      .filter(i => i.type === 'video' || i.type === 'video_file')
+                      .map((vid, i) => (
+                        <div key={i} className="group">
+                          <div className="bg-white p-4 md:p-6 shadow-sm border border-slate-100 transition-all duration-700 hover:shadow-xl">
+                            <div className="aspect-video relative border border-slate-200 p-2 bg-black overflow-hidden rounded-sm">
                               <VideoPlayer url={vid.url} />
                             </div>
-                          </div>
-                          <div className="mt-5 flex justify-between items-center px-1">
-                            <span className="text-[8px] font-black uppercase tracking-widest text-slate-600 italic">Video Memory</span>
-                            <span className="text-[9px] font-mono text-slate-400" style={{ color: profile.accent_color }}>Clip {i + 1}</span>
+                            <div className="mt-6 flex justify-between items-center px-1">
+                              <span className="text-[8px] font-black uppercase tracking-widest text-slate-500 italic">Video Memory</span>
+                              <span className="text-[9px] font-mono text-slate-400" style={{ color: profile.accent_color }}>Clip #0{i + 1}</span>
+                            </div>
                           </div>
                         </div>
                       ))}
-                   </div>
+                  </div>
                 </div>
               )}
             </div>

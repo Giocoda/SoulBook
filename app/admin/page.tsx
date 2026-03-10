@@ -55,11 +55,14 @@ export default function AdminPanel() {
 
       // 1. CANCELLAZIONE FILE FISICI (STORAGE)
       // Questo va fatto sempre via codice perché l'SQL non vede i file.
-      const { data: files } = await supabase.storage.from('gallery').list(profile.owner_id);
-      if (files && files.length > 0) {
-        const filesToRemove = files.map(x => `${profile.owner_id}/${x.name}`);
-        await supabase.storage.from('gallery').remove(filesToRemove);
-      }
+     const buckets = ['gallery', 'videos', 'avatars', 'header_covers'];
+for (const bucket of buckets) {
+  const { data: files } = await supabase.storage.from(bucket).list(profile.owner_id);
+  if (files && files.length > 0) {
+    const filesToRemove = files.map(x => `${profile.owner_id}/${x.name}`);
+    await supabase.storage.from(bucket).remove(filesToRemove);
+  }
+}
 
       // 2. CANCELLAZIONE PROFILO (IL "DOMINO")
       // Grazie al CASCADE che abbiamo messo in SQL, cancellando questo rigo

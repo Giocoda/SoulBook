@@ -30,13 +30,25 @@ function AuthContent() {
     setErrorMsg(null);
 
     try {
-      let userId: string | undefined;
-
       if (isLogin) {
-        const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
+        // 1. Eseguiamo il login
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw new Error("Email o password errati.");
-        userId = authData.user?.id;
+        
+        if (data.session) {
+          // 2. Registriamo la sessione nei cookie (lato client)
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
+
+          // 3. MODIFICA CRUCIALE PER SAFARI: Hard Redirect
+          // Usiamo window.location invece di router.push per forzare il Proxy a leggere i nuovi cookie
+          window.location.href = '/dashboard?verified=true';
+        }
+        
       } else {
+        // --- LOGICA DI REGISTRAZIONE ---
         const { data: authData, error: authError } = await supabase.auth.signUp({ 
           email, 
           password,
@@ -46,7 +58,7 @@ function AuthContent() {
         if (authError) throw authError;
 
         if (authData.user) {
-          userId = authData.user.id;
+          // Aggiorniamo il profilo appena creato
           const { error: profileError } = await supabase
             .from('profiles')
             .update({ 
@@ -55,30 +67,16 @@ function AuthContent() {
               bio: "Benvenuti nel mio spazio dei ricordi.",
               updated_at: new Date().toISOString(),
             })
-            .eq('owner_id', userId);
+            .eq('owner_id', authData.user.id);
 
           if (profileError) throw profileError;
+          
+          // Anche qui, hard redirect dopo la registrazione
+          window.location.href = '/dashboard?verified=true';
         }
       }
-
-      // --- LOGICA DI REDIRECT INTELLIGENTE ---
-      if (userId) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('is_admin')
-          .eq('owner_id', userId)
-          .single();
-
-        if (profile?.is_admin) {
-          router.push('/admin'); // Se admin, vai al pannello operativo
-        } else {
-          router.push('/dashboard'); // Altrimenti dashboard normale
-        }
-      }
-
     } catch (err: any) {
       setErrorMsg(err.message || "Si è verificato un errore imprevisto.");
-    } finally {
       setLoading(false);
     }
   };
@@ -165,6 +163,7 @@ function AuthContent() {
 
           <div className="mt-10 pt-8 border-t border-gray-50 text-center">
             <button 
+              type="button"
               onClick={() => setIsLogin(!isLogin)}
               className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors"
             >
