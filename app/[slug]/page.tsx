@@ -4,8 +4,6 @@ import { useEffect, useState, use, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import Link from 'next/link';
 
-
-
 // --- COMPONENTE GUEST FORM ---
 function GuestMessageForm({ profile, onMessageSent }: { profile: any, onMessageSent: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -17,56 +15,106 @@ function GuestMessageForm({ profile, onMessageSent }: { profile: any, onMessageS
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('sending');
+
+    // 1. Inserimento del messaggio nel database
     const { error } = await supabase.from('messages').insert([{ 
-      profile_id: profile.id, author_name: author || 'Anonimo', content: content, is_public: isPublic 
+      profile_id: profile.id, 
+      author_name: author || 'Anonimo', 
+      content: content, 
+      is_public: isPublic 
     }]);
+
     if (!error) {
-      setStatus('success'); setAuthor(''); setContent(''); onMessageSent();
+      // 2. Invio notifica email se l'email dell'utente esiste (user_email)
+      if (profile.user_email) {
+        try {
+          await fetch('/api/notify-dedication', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ownerEmail: profile.user_email,
+              ownerName: profile.full_name,
+              visitorName: author || 'Anonimo',
+              dedicationText: content,
+              slug: profile.slug,
+              isPublic: isPublic
+            })
+          });
+        } catch (err) {
+          console.error("Errore invio notifica email:", err);
+        }
+      }
+
+      setStatus('success'); 
+      setAuthor(''); 
+      setContent(''); 
+      onMessageSent();
       setTimeout(() => { setStatus('idle'); setIsOpen(false); }, 2000);
     }
   };
 
   return (
     <div className="w-full max-w-xl mx-auto mb-12 px-2 text-center relative z-20">
-      {!isOpen ? (
-        <button 
-          onClick={() => setIsOpen(true)}
-          style={{ backgroundColor: `${profile.accent_color}10`, color: profile.accent_color }}
-          className="w-full py-5 rounded-[2.5rem] font-sans text-[10px] font-black uppercase tracking-[0.2em] border border-slate-200/50 hover:border-current transition-all shadow-sm bg-white/50 backdrop-blur-sm"
-        >
-          ✨ Lascia un pensiero o una dedica
-        </button>
-      ) : (
-        <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 animate-in slide-in-from-top-4 duration-300 text-left">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <textarea 
-              required placeholder="Il tuo ricordo..."
-              className="w-full h-32 p-4 bg-slate-50 rounded-2xl outline-none text-sm border border-transparent focus:border-slate-100 transition-all text-slate-800"
-              value={content} onChange={(e) => setContent(e.target.value)}
-            />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input 
-                type="text" placeholder="Firma"
-                className="w-full p-4 bg-slate-50 rounded-2xl outline-none text-sm border border-transparent focus:border-slate-100 transition-all text-slate-800"
-                value={author} onChange={(e) => setAuthor(e.target.value)}
-              />
-              <div className="flex p-1 bg-slate-100 rounded-2xl">
-                <button type="button" onClick={() => setIsPublic(true)} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${isPublic ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400'}`}>Pubblico</button>
-                <button type="button" onClick={() => setIsPublic(false)} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${!isPublic ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400'}`}>Privato</button>
-              </div>
-            </div>
-            <button 
-              type="submit" disabled={status === 'sending'}
-              style={{ backgroundColor: profile.accent_color }}
-              className="w-full py-5 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg transition-all"
-            >
-              {status === 'success' ? 'Inviato ✓' : 'Pubblica'}
-            </button>
-            <button type="button" onClick={() => setIsOpen(false)} className="w-full text-[9px] font-black uppercase text-slate-300 tracking-widest">Annulla</button>
-          </form>
+  {!isOpen ? (
+    <button 
+      onClick={() => setIsOpen(true)}
+      style={{ backgroundColor: `${profile.accent_color}10`, color: profile.accent_color }}
+      className="w-full py-5 rounded-[2.5rem] font-sans text-[10px] font-black uppercase tracking-[0.2em] border border-slate-200/50 hover:border-current transition-all shadow-sm bg-white/50 backdrop-blur-sm"
+    >
+      ✨ Lascia un pensiero o una dedica
+    </button>
+  ) : (
+    <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 animate-in slide-in-from-top-4 duration-300 text-left">
+      {status === 'success' ? (
+        /* SCHERMATA DI CONFERMA DOPO L'INVIO */
+        <div className="py-8 text-center space-y-4 animate-in fade-in zoom-in duration-300">
+          <div className="text-3xl">✨</div>
+          <h3 className="font-black uppercase text-[10px] tracking-[0.2em]" style={{ color: profile.accent_color }}>
+            Grazie per il tuo pensiero
+          </h3>
+          <p className="text-sm text-slate-500 font-light italic">
+            {isPublic 
+              ? "La tua dedica è stata pubblicata sulla pagina." 
+              : "Il tuo messaggio privato è stato inviato alla famiglia."}
+          </p>
         </div>
+      ) : (
+        /* IL FORM ORIGINALE */
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <textarea 
+            required placeholder="Il tuo ricordo..."
+            className="w-full h-32 p-4 bg-slate-50 rounded-2xl outline-none text-sm border border-transparent focus:border-slate-100 transition-all text-slate-800"
+            value={content} onChange={(e) => setContent(e.target.value)}
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input 
+              type="text" placeholder="Firma"
+              className="w-full p-4 bg-slate-50 rounded-2xl outline-none text-sm border border-transparent focus:border-slate-100 transition-all text-slate-800"
+              value={author} onChange={(e) => setAuthor(e.target.value)}
+            />
+            <div className="flex p-1 bg-slate-100 rounded-2xl">
+              <button type="button" onClick={() => setIsPublic(true)} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${isPublic ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400'}`}>Pubblico</button>
+              <button type="button" onClick={() => setIsPublic(false)} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${!isPublic ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400'}`}>Privato</button>
+            </div>
+          </div>
+          <button 
+            type="submit" disabled={status === 'sending'}
+            style={{ backgroundColor: profile.accent_color }}
+            className="w-full py-5 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg transition-all flex items-center justify-center gap-2"
+          >
+            {status === 'sending' ? (
+              <>
+                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                Invio in corso...
+              </>
+            ) : 'Pubblica'}
+          </button>
+          <button type="button" onClick={() => setIsOpen(false)} className="w-full text-[9px] font-black uppercase text-slate-300 tracking-widest">Annulla</button>
+        </form>
       )}
     </div>
+  )}
+</div>
   );
 }
 
