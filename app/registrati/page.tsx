@@ -9,7 +9,6 @@ function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // Controlliamo se l'utente arriva dalla Home con ?mode=login
   const isLoginFromUrl = searchParams.get('mode') === 'login';
   
   const [mode, setMode] = useState<'login' | 'signup'>(isLoginFromUrl ? 'login' : 'signup');
@@ -22,7 +21,6 @@ function AuthContent() {
   const [activeCode, setActiveCode] = useState<string | null>(null);
 
   useEffect(() => {
-    // Se siamo in modalità registrazione, serve il codice
     if (mode === 'signup') {
       const savedCode = localStorage.getItem('soulbook_activation_code');
       if (savedCode) {
@@ -40,7 +38,7 @@ function AuthContent() {
 
     try {
       if (mode === 'signup') {
-        // --- 1. LOGICA REGISTRAZIONE (Tuo codice originale) ---
+        // --- 1. REGISTRAZIONE AUTH ---
         const { data: authData, error: authError } = await supabase.auth.signUp({ 
           email, 
           password,
@@ -84,6 +82,7 @@ function AuthContent() {
 
         const finalSlug = slug ? slug.toLowerCase().trim().replace(/\s+/g, '-') : authData.user.id;
         
+        // --- 2. CREAZIONE PROFILO ---
         const { error: insertError } = await supabase.from('profiles').insert({
           owner_id: authData.user.id,
           full_name: fullName,
@@ -103,12 +102,29 @@ function AuthContent() {
             used_code: cleanCode
           }).eq('owner_id', authData.user.id);
         }
+
+        // --- 3. INVIO EMAIL DI BENVENUTO (NUOVO) ---
+        try {
+          await fetch('/api/welcome-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: email,
+              fullName: fullName,
+              slug: finalSlug
+            })
+          });
+          console.log("Email di benvenuto inviata correttamente");
+        } catch (emailErr) {
+          console.error("Errore non bloccante nell'invio email:", emailErr);
+          // Non fermiamo l'utente se l'email fallisce, il profilo è comunque creato
+        }
         
         localStorage.removeItem('soulbook_activation_code');
         window.location.href = '/dashboard?verified=true';
 
       } else {
-        // --- 2. LOGICA LOGIN (Nuova) ---
+        // --- 4. LOGIN ---
         const { error: loginError } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -157,12 +173,11 @@ function AuthContent() {
             <input type="email" placeholder="Email" required className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:border-slate-900 outline-none font-bold text-slate-900" value={email} onChange={(e) => setEmail(e.target.value)} />
             <input type="password" placeholder="Password" required className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:border-slate-900 outline-none font-bold text-slate-900" value={password} onChange={(e) => setPassword(e.target.value)} />
             
-            <button disabled={loading} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] hover:bg-blue-600 transition-all shadow-xl shadow-slate-100 disabled:bg-slate-100 mt-6">
+            <button disabled={loading} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] hover:bg-slate-800 transition-all shadow-xl shadow-slate-100 disabled:bg-slate-100 mt-6">
               {loading ? 'Elaborazione...' : mode === 'signup' ? 'Registrati e Attiva' : 'Entra nella Dashboard'}
             </button>
           </form>
 
-          {/* Tasto per switchare */}
           <div className="mt-8 text-center">
             <button 
               onClick={() => {
