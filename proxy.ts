@@ -32,9 +32,9 @@ export async function proxy(request: NextRequest) {
   // --- LOGICA DI PROTEZIONE ---
   if (path.startsWith('/admin') || path.startsWith('/super-admin') || path === '/dashboard') {
     
-    // Se non è loggato, lo mandiamo a registrarsi (tranne se è già lì)
+    // Se non è loggato, lo mandiamo al login (tranne se è già lì)
     if (!user) {
-      return NextResponse.redirect(new URL('/registrati', request.url))
+      return NextResponse.redirect(new URL('/registrati?mode=login', request.url))
     }
 
     // Recuperiamo il profilo
