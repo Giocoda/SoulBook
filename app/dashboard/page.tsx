@@ -251,13 +251,13 @@ export default function Dashboard() {
             <h1 className="font-bold uppercase text-lg tracking-wider text-stone-800">
               Soulbook <span className="font-light text-stone-400">Admin</span>
             </h1>
-            <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="md:hidden px-4 py-2 bg-red-50 text-red-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-red-100">Esci</button>
+            <button onClick={() => supabase.auth.signOut().then(() => router.push('/'))} className="md:hidden px-4 py-2 bg-red-50 text-red-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-red-100">Esci</button>
           </div>
           <div className="flex bg-stone-100 p-1 rounded-xl gap-1 w-full md:w-auto">
             <button onClick={() => setActiveTab('content')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'content' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-400'}`}>Contenuti</button>
             <button onClick={() => setActiveTab('messages')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'messages' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-400'}`}>Messaggi ({messages.length})</button>
           </div>
-          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="hidden md:block px-5 py-2.5 bg-stone-50 text-stone-400 hover:text-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest">Esci</button>
+          <button onClick={() => supabase.auth.signOut().then(() => router.push('/'))} className="hidden md:block px-5 py-2.5 bg-stone-50 text-stone-400 hover:text-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest">Esci</button>
         </div>
       </nav>
 

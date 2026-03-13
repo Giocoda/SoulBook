@@ -38,6 +38,20 @@ function AuthContent() {
 
     try {
       if (mode === 'signup') {
+        const cleanCode = activeCode?.toUpperCase().trim();
+        if (!cleanCode) throw new Error("Codice di attivazione mancante.");
+
+        // --- 0. CONTROLLO PREVENTIVO (BAN & UTILIZZO) ---
+        const { data: codeCheck, error: codeError } = await supabase
+          .from('activation_codes')
+          .select('agency_id, is_used, is_banned, agencies(name)')
+          .eq('code', cleanCode)
+          .maybeSingle();
+
+        if (codeError || !codeCheck) throw new Error("Codice non valido.");
+        if (codeCheck.is_banned) throw new Error("QUESTA KEY È STATA DISATTIVATA DEFINITIVAMENTE.");
+        if (codeCheck.is_used) throw new Error("Questa Key è già stata utilizzata.");
+
         // --- 1. REGISTRAZIONE AUTH ---
         const { data: authData, error: authError } = await supabase.auth.signUp({ 
           email, 
@@ -52,37 +66,15 @@ function AuthContent() {
           return;
         }
 
+        // Impostiamo la sessione subito per essere "authenticated" nelle policy
         await supabase.auth.setSession(authData.session);
 
-        let agencyIdToLink = null;
-        let partnerNameToLink = null;
-        const cleanCode = activeCode?.toUpperCase().trim();
-
-        if (cleanCode) {
-          const { data: codeData } = await supabase
-            .from('activation_codes')
-            .select('agency_id, agencies(name)')
-            .eq('code', cleanCode)
-            .single();
-          
-          if (codeData) {
-            agencyIdToLink = codeData.agency_id;
-            partnerNameToLink = (codeData.agencies as any)?.name || 'Partner';
-
-            await supabase
-              .from('activation_codes')
-              .update({ 
-                is_used: true, 
-                activated_at: new Date().toISOString(), 
-                profile_id: authData.user.id 
-              })
-              .eq('code', cleanCode);
-          }
-        }
-
         const finalSlug = slug ? slug.toLowerCase().trim().replace(/\s+/g, '-') : authData.user.id;
-        
+        const agencyIdToLink = codeCheck.agency_id;
+        const partnerNameToLink = (codeCheck.agencies as any)?.name || 'Partner';
+
         // --- 2. CREAZIONE PROFILO ---
+        // Lo facciamo PRIMA dell'aggiornamento del codice
         const { error: insertError } = await supabase.from('profiles').insert({
           owner_id: authData.user.id,
           full_name: fullName,
@@ -94,6 +86,7 @@ function AuthContent() {
         });
 
         if (insertError) {
+          console.error("Errore inserimento profilo, provo update:", insertError);
           await supabase.from('profiles').update({
             full_name: fullName,
             slug: finalSlug,
@@ -103,33 +96,36 @@ function AuthContent() {
           }).eq('owner_id', authData.user.id);
         }
 
-        // --- 3. INVIO EMAIL DI BENVENUTO (NUOVO) ---
+        // --- 3. AGGIORNAMENTO CODICE (Importante per Inventory) ---
+        // Usiamo profile_id come confermato dal tuo DB
+        const { error: updateCodeError } = await supabase
+          .from('activation_codes')
+          .update({ 
+            is_used: true, 
+            activated_at: new Date().toISOString(), 
+            profile_id: authData.user.id 
+          })
+          .eq('code', cleanCode);
+        
+        if (updateCodeError) console.error("Errore update activation_codes:", updateCodeError);
+
+        // --- 4. INVIO EMAIL ---
         try {
           await fetch('/api/welcome-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: email,
-              fullName: fullName,
-              slug: finalSlug
-            })
+            body: JSON.stringify({ email, fullName, slug: finalSlug })
           });
-          console.log("Email di benvenuto inviata correttamente");
         } catch (emailErr) {
-          console.error("Errore non bloccante nell'invio email:", emailErr);
-          // Non fermiamo l'utente se l'email fallisce, il profilo è comunque creato
+          console.error("Errore invio email:", emailErr);
         }
         
         localStorage.removeItem('soulbook_activation_code');
         window.location.href = '/dashboard?verified=true';
 
       } else {
-        // --- 4. LOGIN ---
-        const { error: loginError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
+        // --- LOGIN ---
+        const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
         if (loginError) throw loginError;
         router.push('/dashboard');
       }
@@ -161,7 +157,11 @@ function AuthContent() {
             </h2>
           </div>
 
-          {errorMsg && <div className="mb-6 p-4 bg-red-50 text-red-600 text-[10px] font-black uppercase tracking-widest rounded-2xl border border-red-100">{errorMsg}</div>}
+          {errorMsg && (
+            <div className="mb-6 p-4 bg-red-50 text-red-600 text-[10px] font-black uppercase tracking-widest rounded-2xl border border-red-100">
+              {errorMsg}
+            </div>
+          )}
           
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (

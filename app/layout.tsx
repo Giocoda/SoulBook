@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import CookieBanner from '@/components/CookieBanner'; 
-import Link from 'next/link';
+// 1. Importiamo il nuovo componente
+import Footer from '../components/Footer'; 
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,31 +34,8 @@ export default function RootLayout({
           {children}
         </main>
 
-        {/* --- FOOTER GLOBALE STILE SOULBOOK --- */}
-        <footer className="py-20 border-t border-slate-100 text-center space-y-10 bg-white">
-          
-          {/* Tagline originale */}
-          <div className="text-sm font-serif italic text-slate-400">
-            SoulBook &mdash; Custodisci la tua storia.
-          </div>
-
-          {/* Dettagli proprietà e Privacy */}
-          <div className="space-y-4">
-            <div className="text-[8px] font-black uppercase tracking-[0.5em] text-slate-300">
-              &copy; 2026 SoulBook Digital Services — Proprietà di Giovanni Coda Mer
-            </div>
-            
-            <div>
-              <Link 
-                href="/privacy" 
-                className="text-[8px] font-black uppercase tracking-[0.5em] text-slate-300 hover:text-slate-900 transition-colors border-b border-transparent hover:border-slate-200 pb-1"
-              >
-                Privacy & Cookie Policy
-              </Link>
-            </div>
-          </div>
-
-        </footer>
+        {/* --- 2. USIAMO IL COMPONENTE GLOBALE --- */}
+        <Footer />
 
         {/* Banner Cookie */}
         <CookieBanner />

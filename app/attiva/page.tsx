@@ -15,9 +15,10 @@ export default function AttivaCodice() {
     setStatus({ type: 'idle', msg: '' });
 
     try {
+      // Modificata la select per includere is_banned (gestito dal trigger nel DB)
       const { data: codeData, error: codeError } = await supabase
         .from('activation_codes')
-        .select('code, is_used, agency_id')
+        .select('code, is_used, agency_id, is_banned')
         .eq('code', code.toUpperCase().trim())
         .single();
 
@@ -25,6 +26,13 @@ export default function AttivaCodice() {
         setStatus({ type: 'error', msg: 'Codice non trovato o errato.' });
         setLoading(false);
         return;
+      }
+
+      // --- IL NUOVO BLOCCO BAN ---
+      if (codeData.is_banned === true || String(codeData.is_banned) === 'true') {
+        setStatus({ type: 'error', msg: 'QUESTA KEY È STATA DISATTIVATA DEFINITIVAMENTE. CONTATTA ASSISTENZA' });
+        setLoading(false);
+        return; // Blocca il passaggio a /registrati
       }
 
       if (codeData.is_used) {
