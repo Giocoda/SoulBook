@@ -28,7 +28,7 @@ interface Agency {
   notes?: string;
   is_active: boolean;
   is_banned: boolean;
-  package_price: number;      
+  package_price: number;
   last_batch_date: string;    
   activation_codes: ActivationCode[];
   orders: Order[]; 
@@ -53,6 +53,7 @@ export default function SuperAdmin() {
   const [batchName, setBatchName] = useState('Standard Pack')
   const [packagePrice, setPackagePrice] = useState('0') 
 
+  
   const fetchAgencies = useCallback(async () => {
     const { data: agData, error: agError } = await supabase
       .from('agencies')
@@ -73,7 +74,6 @@ export default function SuperAdmin() {
         user_name: profData?.find(p => p.used_code === c.code)?.full_name
       }))
     }));
-
     setAgencies(enriched);
   }, []);
 
@@ -102,7 +102,6 @@ export default function SuperAdmin() {
     const filtered = allEntries.filter(item => {
       const matchesSearch = item.agencyName.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             item.batch_name.toLowerCase().includes(searchTerm.toLowerCase());
-      
       let matchesDate = true;
       if (filterMonth && filterMonth.length === 7) {
         const [fMonth, fYear] = filterMonth.split('/');
@@ -114,17 +113,11 @@ export default function SuperAdmin() {
       return matchesSearch && matchesDate;
     });
 
-    // Calcolo Key Periodo: escludiamo i pacchetti dei partner bannati
     const nonBannedEntries = filtered.filter(f => !f.isAgencyBanned);
-    const periodUsedKeys = nonBannedEntries.reduce((acc, curr) => acc + curr.usedKeys, 0);
-    const periodTotalKeys = nonBannedEntries.reduce((acc, curr) => acc + curr.totalKeys, 0);
-
-    const totalRevenue = filtered.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-
     return { 
-      totalRevenue, 
-      periodUsedKeys,
-      periodTotalKeys,
+      totalRevenue: filtered.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0), 
+      periodUsedKeys: nonBannedEntries.reduce((acc, curr) => acc + curr.usedKeys, 0),
+      periodTotalKeys: nonBannedEntries.reduce((acc, curr) => acc + curr.totalKeys, 0),
       filteredOrders: filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) 
     };
   }, [agencies, searchTerm, filterMonth]);
@@ -139,36 +132,51 @@ export default function SuperAdmin() {
     e.preventDefault();
     setIsSaving(true);
     try {
-      const { data: newAgency, error: agError } = await supabase.from('agencies')
-        .insert([{ 
-            name: agencyName, 
-            email: agencyEmail, 
-            type: agencyType || 'Partner', 
-            notes: agencyNotes, 
-            is_active: true,
-            package_price: parseFloat(packagePrice),
-            last_batch_date: new Date().toISOString()
-        }])
-        .select().single();
-      if (agError) throw agError;
+      // 1. CHIAMATA API (Invia mail e crea l'agenzia nel backend)
+      const inviteRes = await fetch('/api/invite-partner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: agencyEmail, name: agencyName }),
+      });
 
-      await supabase.from('orders').insert([{
-        agency_id: newAgency.id,
-        amount: parseFloat(packagePrice),
-        batch_name: batchName
-      }]);
+      if (!inviteRes.ok) {
+        const errData = await inviteRes.json();
+        throw new Error(errData.error || "Errore invio mail");
+      }
 
+      // 2. RECUPERO ID AGENZIA APPENA CREATA (per evitare doppioni manuali)
+      const { data: newAg, error: getErr } = await supabase
+        .from('agencies')
+        .select('id')
+        .eq('email', agencyEmail)
+        .single();
+
+      if (getErr || !newAg) throw new Error("Agenzia creata ma non rintracciata.");
+
+      // 3. GENERAZIONE CODICI E ORDINE INIZIALE
       const codes = Array.from({ length: 5 }, () => ({ 
         code: generateCode(), 
-        agency_id: newAgency.id, 
+        agency_id: newAg.id, 
         batch_name: batchName 
       }));
-      await supabase.from('activation_codes').insert(codes);
-      
+
+      await Promise.all([
+        supabase.from('activation_codes').insert(codes),
+        supabase.from('orders').insert([{
+          agency_id: newAg.id,
+          amount: parseFloat(packagePrice),
+          batch_name: batchName
+        }])
+      ]);
+
       setAgencyName(''); setAgencyEmail(''); setAgencyType(''); setAgencyNotes(''); setPackagePrice('0');
       fetchAgencies();
-    } catch (err: any) { alert(err.message); }
-    finally { setIsSaving(false); }
+      alert(`Successo! Partner configurato per ${agencyEmail}`);
+    } catch (err: any) { 
+      alert(err.message); 
+    } finally { 
+      setIsSaving(false); 
+    }
   };
 
   const handleRefillCodes = async (agencyId: string, agencyName: string) => {
@@ -181,13 +189,7 @@ export default function SuperAdmin() {
     try {
       const newCodes = Array.from({ length: amount }, () => ({ code: generateCode(), agency_id: agencyId, batch_name: batch }));
       await supabase.from('activation_codes').insert(newCodes);
-      
-      await supabase.from('orders').insert([{
-          agency_id: agencyId,
-          amount: parseFloat(price || "0"),
-          batch_name: batch
-      }]);
-
+      await supabase.from('orders').insert([{ agency_id: agencyId, amount: parseFloat(price || "0"), batch_name: batch }]);
       await supabase.from('agencies').update({ last_batch_date: new Date().toISOString() }).eq('id', agencyId);
       fetchAgencies();
     } catch (err: any) { alert(err.message); }
@@ -220,19 +222,16 @@ export default function SuperAdmin() {
   return (
     <div className="min-h-screen bg-[#FDFDFD] p-6 md:p-12 font-sans text-[#0F172A]">
       <div className="max-w-7xl mx-auto">
-        
         <header className="mb-12 flex justify-between items-center">
           <div>
             <h1 className="text-4xl font-black tracking-tighter uppercase">SOULBOOK <span className="text-slate-300">HQ</span></h1>
             <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-slate-400 mt-2 italic">Contabilità & Key Management</p>
           </div>
-          <a href="/admin" className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all shadow-lg flex items-center gap-2">
-            🛡️ Moderazione
-          </a>
+          <a href="/admin" className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all shadow-lg flex items-center gap-2">Moderazione</a>
         </header>
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-12">
-          {/* PANEL: NUOVA REGISTRAZIONE */}
+          {/* PANEL: ONBOARDING */}
           <div className="xl:col-span-4 bg-white border border-[#E2E8F0] p-10 rounded-3xl shadow-lg shadow-[#0F172A]/5 h-fit sticky top-12">
             <h2 className="text-[10px] font-black uppercase tracking-widest text-[#64748B] mb-8 flex items-center gap-2">
               <span className="w-2 h-2 bg-[#2563EB] rounded-full animate-pulse"></span>
@@ -258,7 +257,7 @@ export default function SuperAdmin() {
 
           {/* PANEL: TABELLA PARTNER */}
           <div className="xl:col-span-8 bg-white border border-[#E2E8F0] rounded-3xl shadow-sm overflow-hidden h-fit">
-            <div className="p-6 bg-[#F8FAFC] border-b border-[#E2E8F0] flex justify-between items-center">
+             <div className="p-6 bg-[#F8FAFC] border-b border-[#E2E8F0] flex justify-between items-center">
               <h3 className="text-[10px] font-black uppercase tracking-widest text-[#64748B] italic">Gestione Operativa</h3>
               <button onClick={() => setShowArchived(!showArchived)} className="text-[9px] font-black uppercase px-4 py-2 bg-white border border-slate-200 rounded-xl">
                 {showArchived ? 'Vedi Attivi' : 'Vedi Archivio'}
@@ -280,7 +279,6 @@ export default function SuperAdmin() {
                     const totalCount = agency.activation_codes?.length || 0;
                     const isExpanded = expandedAgencyId === agency.id;
                     const totalInvested = agency.orders?.reduce((sum, o) => sum + (Number(o.amount) || 0), 0) || Number(agency.package_price) || 0;
-
                     return (
                       <Fragment key={agency.id}>
                         <tr className={`border-b border-[#E2E8F0] hover:bg-[#F8FAFC]/50 transition-colors ${isExpanded ? 'bg-[#F8FAFC]' : ''}`}>
@@ -298,19 +296,22 @@ export default function SuperAdmin() {
                           <td className="p-6 text-right space-x-2">
                              {agency.is_active ? (
                                <>
-                                <button onClick={() => handleRefillCodes(agency.id, agency.name)} className="p-3 bg-white border border-slate-200 text-[#0F172A] rounded-xl text-[9px] font-black uppercase shadow-sm">Ricarica</button>
-                                <button onClick={() => setExpandedAgencyId(isExpanded ? null : agency.id)} className={`p-3 rounded-xl text-[9px] font-black uppercase ${isExpanded ? 'bg-blue-600 text-white' : 'bg-[#0F172A] text-white'}`}>
+                                 <button onClick={() => handleRefillCodes(agency.id, agency.name)} className="p-3 bg-white border border-slate-200 text-[#0F172A] rounded-xl text-[9px] font-black uppercase shadow-sm">Ricarica</button>
+                                 <button onClick={() => setExpandedAgencyId(isExpanded ? null : agency.id)} className={`p-3 rounded-xl text-[9px] font-black uppercase ${isExpanded ? 'bg-blue-600 text-white' : 'bg-[#0F172A] text-white'}`}>
                                   {isExpanded ? 'Chiudi' : 'Key'}
-                                </button>
-                                <button onClick={() => toggleAgencyStatus(agency.id, agency.name, true)} className="p-3 bg-red-50 text-red-400 rounded-xl text-[9px] font-black uppercase">✕</button>
+                                 </button>
+                                 <button onClick={() => toggleAgencyStatus(agency.id, agency.name, true)} className="p-3 bg-red-50 text-red-400 rounded-xl text-[9px] font-black uppercase group">
+                                    <span className="group-hover:hidden italic font-bold">Attivo</span>
+                                    <span className="hidden group-hover:block font-black">Archivia</span>
+                                 </button>
                                </>
                              ) : (
                                <div className="flex items-center justify-end gap-2">
-                                <button onClick={() => toggleAgencyBan(agency.id, agency.name, agency.is_banned)} className={`p-3 rounded-xl text-[9px] font-black uppercase ${agency.is_banned ? 'bg-amber-500 text-white' : 'bg-slate-100'}`}>
-                                  {agency.is_banned ? '🚫 Sblocca' : 'Banna'}
+                                 <button onClick={() => toggleAgencyBan(agency.id, agency.name, agency.is_banned)} className={`p-3 rounded-xl text-[9px] font-black uppercase ${agency.is_banned ? 'bg-amber-500 text-white' : 'bg-slate-100'}`}>
+                                  {agency.is_banned ? 'Sblocca' : 'Banna'}
                                 </button>
-                                <button onClick={() => toggleAgencyStatus(agency.id, agency.name, false)} className="p-3 bg-green-50 text-green-600 rounded-xl text-[9px] font-black uppercase">↻</button>
-                              </div>
+                                 <button onClick={() => toggleAgencyStatus(agency.id, agency.name, false)} className="p-3 bg-green-50 text-green-600 rounded-xl text-[9px] font-black uppercase">Ripristina</button>
+                               </div>
                              )}
                           </td>
                         </tr>
@@ -318,14 +319,12 @@ export default function SuperAdmin() {
                           <tr>
                             <td colSpan={3} className="p-0 bg-[#F8FAFC]">
                               <div className="p-8 border-x border-[#E2E8F0] space-y-8">
-                                {Object.entries(
-                                  agency.activation_codes.reduce((acc, code) => {
+                                {Object.entries(agency.activation_codes.reduce((acc, code) => {
                                     const bName = code.batch_name || 'Standard';
                                     if (!acc[bName]) acc[bName] = [];
                                     acc[bName].push(code);
                                     return acc;
-                                  }, {} as Record<string, ActivationCode[]>)
-                                ).map(([batchTitle, codes]) => (
+                                }, {} as Record<string, ActivationCode[]>)).map(([batchTitle, codes]) => (
                                   <div key={batchTitle} className="space-y-4">
                                     <div className="flex items-center gap-4">
                                       <div className="h-[1px] flex-1 bg-slate-200"></div>
@@ -344,16 +343,9 @@ export default function SuperAdmin() {
                                             </span>
                                           </div>
                                           {c.is_used && c.user_name ? (
-                                              <div className="text-[9px] font-black text-blue-600 bg-blue-50/50 p-2 rounded-lg truncate">
-                                                👤 {c.user_name}
-                                              </div>
+                                              <div className="text-[9px] font-black text-blue-600 bg-blue-50/50 p-2 rounded-lg truncate">{c.user_name}</div>
                                             ) : (
-                                              <button 
-                                                onClick={() => setPrintingCode({ code: c.code, agency: agency.name })} 
-                                                className="w-full py-2 bg-[#0F172A] text-white text-[8px] font-black uppercase rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-1"
-                                              >
-                                                Stampa <span className="text-[10px]">🖨️</span>
-                                              </button>
+                                              <button onClick={() => setPrintingCode({ code: c.code, agency: agency.name })} className="w-full py-2 bg-[#0F172A] text-white text-[8px] font-black uppercase rounded-lg hover:bg-blue-600 transition-colors">Stampa</button>
                                             )}
                                         </div>
                                       ))}
@@ -373,161 +365,129 @@ export default function SuperAdmin() {
           </div>
         </div>
 
-        {/* REGISTRO STORICO */}
-        <div className="xl:col-span-12 mt-12 bg-white border border-[#E2E8F0] rounded-[30px] shadow-sm overflow-hidden">
-          <div className="p-8 border-b border-[#E2E8F0] bg-[#F8FAFC] flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            <div>
-              <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 mb-1">Accounting Ledger</h3>
-              <h2 className="text-2xl font-black tracking-tighter text-[#0F172A]">REGISTRO STORICO TRANSAZIONI</h2>
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="relative">
-                <input 
-                  type="text"
-                  placeholder="Cerca partner..."
-                  className="pl-10 pr-4 py-3 bg-white border border-[#E2E8F0] rounded-xl text-[10px] font-bold uppercase outline-none focus:border-blue-500 w-56 shadow-sm"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30 text-xs">🔍</span>
-              </div>
-
-              {/* FILTRO DATA MM/AAAA */}
-              <div className="flex items-center gap-3 bg-white border border-[#E2E8F0] rounded-xl px-4 py-2 shadow-sm focus-within:border-blue-500 transition-all">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Filtra Mese:</span>
-                <input 
-                  type="text"
-                  placeholder="MM/AAAA"
-                  className="bg-transparent text-[11px] font-black uppercase outline-none w-20"
-                  maxLength={7}
-                  value={filterMonth}
-                  onChange={(e) => {
-                    let val = e.target.value.replace(/\D/g, '');
-                    if (val.length > 2) val = val.substring(0, 2) + '/' + val.substring(2, 6);
-                    setFilterMonth(val);
-                  }}
-                />
-                {filterMonth && (
-                    <button onClick={() => setFilterMonth('')} className="text-red-500 text-[9px] font-black">RESET</button>
-                )}
-              </div>
-
-              <div className="flex gap-6 border-l border-[#E2E8F0] pl-8">
-                <div className="text-right">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Key Periodo (Att/Tot)</p>
-                  <p className="text-xl font-black text-[#0F172A]">{stats.periodUsedKeys} / {stats.periodTotalKeys}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Incasso Periodo</p>
-                  <p className="text-xl font-black text-green-600">€ {stats.totalRevenue.toLocaleString()}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
-                  <th className="p-6 text-[9px] font-black uppercase tracking-widest text-slate-500">Data</th>
-                  <th className="p-6 text-[9px] font-black uppercase tracking-widest text-slate-500">Partner</th>
-                  <th className="p-6 text-[9px] font-black uppercase tracking-widest text-slate-500">Nome Pacchetto</th>
-                  <th className="p-6 text-[9px] font-black uppercase tracking-widest text-slate-500 text-center">Utilizzo Key</th>
-                  <th className="p-6 text-[9px] font-black uppercase tracking-widest text-slate-500 text-right">Importo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {stats.filteredOrders.length > 0 ? (
-                  stats.filteredOrders.map((order: any, idx) => (
-                    <tr key={idx} className={`hover:bg-[#F8FAFC]/80 transition-colors group ${order.isAgencyBanned ? 'bg-red-50/20' : ''}`}>
-                      <td className="p-6">
-                        <span className="font-mono text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">
-                          {new Date(order.created_at).toLocaleDateString('it-IT')}
-                        </span>
-                      </td>
-                      <td className="p-6">
-                        <div className="flex items-center gap-3">
-                          <span className={`text-[11px] font-black uppercase tracking-tight ${order.isAgencyBanned ? 'text-red-600 opacity-60' : 'text-[#0F172A]'}`}>
-                            {order.agencyName}
-                          </span>
-                          {order.isAgencyBanned && <span className="text-[7px] font-black bg-red-600 text-white px-1.5 py-0.5 rounded">BANNED</span>}
-                        </div>
-                      </td>
-                      <td className="p-6">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-bold text-slate-600 uppercase">{order.batch_name}</span>
-                          <span className="text-[8px] font-medium text-slate-400 italic">TX: {order.id.split('-')[0]}</span>
-                        </div>
-                      </td>
-                      <td className="p-6 text-center">
-                        <div className="inline-flex flex-col items-center">
-                            <span className="text-[10px] font-black text-[#0F172A]">{order.usedKeys} / {order.totalKeys}</span>
-                            <div className="w-16 h-1 bg-slate-100 rounded-full mt-1 overflow-hidden">
-                              <div 
-                                className={`h-full transition-all ${order.usedKeys === order.totalKeys ? 'bg-green-500' : 'bg-blue-500'}`} 
-                                style={{ width: `${order.totalKeys > 0 ? (order.usedKeys / order.totalKeys) * 100 : 0}%` }}
-                              />
-                            </div>
-                          </div>
-                      </td>
-                      <td className="p-6 text-right">
-                        <span className="text-sm font-black font-mono text-green-600">
-                          € {Number(order.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="p-12 text-center text-[10px] font-black uppercase tracking-[0.3em] text-slate-300 italic">
-                      Nessun ordine trovato per i filtri selezionati
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        {/* REGISTRO STORICO RIPRISTINATO CON GRAFICA ORIGINALE */}
+<div className="xl:col-span-12 mt-12 bg-white border border-[#E2E8F0] rounded-[30px] shadow-sm overflow-hidden">
+  <div className="p-8 border-b border-[#E2E8F0] bg-[#F8FAFC] flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+    <div>
+      <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 mb-1">Accounting Ledger</h3>
+      <h2 className="text-2xl font-black tracking-tighter text-[#0F172A]">REGISTRO STORICO TRANSAZIONI</h2>
+    </div>
+    <div className="flex flex-wrap items-center gap-4">
+       <input type="text" placeholder="Cerca partner..." className="pl-6 pr-4 py-3 bg-white border border-[#E2E8F0] rounded-xl text-[10px] font-bold uppercase outline-none focus:border-blue-500 w-56 shadow-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+      <div className="flex items-center gap-3 bg-white border border-[#E2E8F0] rounded-xl px-4 py-2 shadow-sm focus-within:border-blue-500 transition-all">
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Mese:</span>
+        <input type="text" placeholder="MM/AAAA" className="bg-transparent text-[11px] font-black uppercase outline-none w-20" maxLength={7} value={filterMonth} onChange={(e) => {
+            let val = e.target.value.replace(/\D/g, '');
+            if (val.length > 2) val = val.substring(0, 2) + '/' + val.substring(2, 6);
+            setFilterMonth(val);
+        }} />
+        {filterMonth && <button onClick={() => setFilterMonth('')} className="text-red-500 text-[9px] font-black">×</button>}
+      </div>
+      <div className="flex gap-6 border-l border-[#E2E8F0] pl-8">
+        <div className="text-right">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Key Periodo</p>
+          <p className="text-xl font-black text-[#0F172A]">{stats.periodUsedKeys} / {stats.periodTotalKeys}</p>
         </div>
+        <div className="text-right">
+          <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Incasso Periodo</p>
+          <p className="text-xl font-black text-green-600">€ {stats.totalRevenue.toLocaleString()}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div className="overflow-x-auto">
+    <table className="w-full text-left border-collapse">
+      <thead>
+        <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
+          <th className="p-6 text-[9px] font-black uppercase tracking-widest text-slate-500">Data</th>
+          <th className="p-6 text-[9px] font-black uppercase tracking-widest text-slate-500">Partner</th>
+          <th className="p-6 text-[9px] font-black uppercase tracking-widest text-slate-500">Pacchetto</th>
+          <th className="p-6 text-[9px] font-black uppercase tracking-widest text-slate-500 text-center">Utilizzo</th>
+          <th className="p-6 text-[9px] font-black uppercase tracking-widest text-slate-500 text-right">Importo</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-100">
+        {stats.filteredOrders.map((order: any, idx) => (
+            <tr key={idx} className={`hover:bg-[#F8FAFC]/80 transition-colors group ${order.isAgencyBanned ? 'bg-red-50/20' : ''}`}>
+              <td className="p-6 font-mono text-[11px] text-slate-500">{new Date(order.created_at).toLocaleDateString('it-IT')}</td>
+              <td className="p-6 font-black uppercase text-[#0F172A] text-xs">
+                {order.agencyName}
+                {order.isAgencyBanned && <span className="ml-2 text-[7px] bg-red-600 text-white px-1 py-0.5 rounded animate-pulse">BAN</span>}
+              </td>
+              <td className="p-6">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">{order.batch_name}</span>
+                  <button 
+                    onClick={() => {
+                      setSearchTerm(order.agencyName);
+                      // Usiamo l'ID corretto per espandere il partner sopra
+                      setExpandedAgencyId(order.agency_id || order.id.replace('legacy-', ''));
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="text-[9px] font-mono text-blue-500 hover:text-blue-700 mt-1 text-left w-fit flex items-center gap-1"
+                  >
+                    <span className="opacity-50">{order.id.split('-')[0]}</span>
+                    <span className="font-black">[Apri]</span>
+                  </button>
+                </div>
+              </td>
+              <td className="p-6 text-center">
+                <span className="text-[10px] font-black">{order.usedKeys} / {order.totalKeys}</span>
+              </td>
+              <td className="p-6 text-right font-black font-mono text-green-600 text-sm">€ {Number(order.amount).toLocaleString()}</td>
+            </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
 
-        {/* PRINT PREVIEW */}
-        {printingCode && (
-          <div className="fixed inset-0 bg-[#FDFDFD] z-[100] flex flex-col items-center justify-center no-print">
-            <div className="absolute top-10 flex gap-4">
-              <button onClick={() => setPrintingCode(null)} className="px-8 py-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-full text-[10px] font-black uppercase tracking-widest">Esci</button>
-              <button onClick={downloadCard} className="px-8 py-4 bg-[#0F172A] text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl">Download PNG</button>
-            </div>
-            <div ref={cardRef} className="w-[600px] h-[360px] bg-[#0F172A] rounded-[50px] p-12 flex flex-col justify-between relative shadow-2xl overflow-hidden border-8 border-white">
-               <div className="absolute -right-10 -top-10 w-56 h-56 bg-slate-900 rounded-full" />
-               <div className="relative text-white/90">
-                  <h3 className="text-4xl font-black italic tracking-tighter leading-none text-white font-sans uppercase">SOULBOOK</h3>
-                  <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/50 mt-3 flex items-center gap-1.5 italic underline underline-offset-4 decoration-blue-500">Card Attivazione</p>
-               </div>
-               <div className="relative flex items-center gap-10">
-                  <div className="bg-white p-3.5 rounded-2xl">
-                     <QRCodeSVG value={`https://soulbookitalia.it/attiva?code=${printingCode.code}`} size={70} />
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.4em] text-white/30 mb-1.5 italic font-mono">Secret Key</p>
-                    <div className="text-4xl font-mono font-black text-white tracking-widest border-b-2 border-white/10 pb-1.5">{printingCode.code}</div>
-                  </div>
-               </div>
-               <div className="relative flex justify-between items-end">
-                  <div className="max-w-[70%]">
-                    <p className="text-[8px] font-black uppercase text-white/30 italic mb-1.5 tracking-widest">Partner Ufficiale</p>
-                    <p className="text-lg font-black text-white uppercase italic tracking-tight truncate">{printingCode.agency}</p>
-                  </div>
-                  <p className="text-[10px] font-black text-white/30 tracking-widest font-mono uppercase italic">soulbookitalia.it</p>
-               </div>
+        {/* PRINT CARD */}
+{printingCode && (
+  <div className="fixed inset-0 bg-[#FDFDFD] z-[100] flex flex-col items-center justify-center no-print">
+    <div className="absolute top-10 flex gap-4">
+      <button onClick={() => setPrintingCode(null)} className="px-8 py-4 border rounded-full text-[10px] font-black uppercase tracking-widest">Esci</button>
+      <button onClick={downloadCard} className="px-8 py-4 bg-[#0F172A] text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl">Download PNG</button>
+    </div>
+
+    <div ref={cardRef} className="w-[600px] h-[360px] bg-[#0F172A] rounded-[50px] p-12 flex flex-col justify-between relative shadow-2xl border-8 border-white overflow-hidden">
+       <div className="absolute -right-10 -top-10 w-56 h-56 bg-slate-900 rounded-full" />
+       
+       <div>
+          <h3 className="text-4xl font-black italic text-white uppercase leading-none">SOULBOOK</h3>
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/50 mt-3 flex items-center gap-1.5 italic underline underline-offset-4 decoration-blue-500">Card Attivazione</p>
+       </div>
+
+       <div className="flex items-center gap-8"> {/* Ridotto leggermente gap per dare spazio al testo */}
+          <div className="bg-white p-3.5 rounded-2xl shrink-0">
+            <QRCodeSVG value={`https://soulbookitalia.it/attiva?code=${printingCode.code}`} size={70} />
+          </div>
+          
+          <div className="flex-1 overflow-visible"> {/* overflow-visible è fondamentale */}
+            <p className="text-[9px] font-black uppercase tracking-[0.4em] text-white/30 mb-1.5 italic font-mono">Secret Key</p>
+            {/* Cambiato tracking-widest in tracking-wider e aggiunto pr-10 di sicurezza */}
+            <div className="text-4xl font-mono font-black text-white tracking-wider border-b-2 border-white/10 pb-1.5 pr-10 whitespace-nowrap inline-block">
+              {printingCode.code}
             </div>
           </div>
-        )}
+       </div>
+
+       <div className="flex justify-between items-end">
+          <div className="max-w-[65%]">
+            <p className="text-[8px] font-black uppercase text-white/30 italic mb-1.5 tracking-widest">Partner Ufficiale</p>
+            <p className="text-lg font-black text-white uppercase italic truncate">
+              {printingCode.agency}
+            </p>
+          </div>
+          <p className="text-[10px] font-black text-white/30 tracking-widest font-mono uppercase italic">soulbookitalia.it</p>
+       </div>
+    </div>
+  </div>
+)}
       </div>
 
       <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
         @media print { .no-print { display: none !important; } }
       `}</style>
     </div>

@@ -26,39 +26,62 @@ export async function proxy(request: NextRequest) {
     }
   )
 
+  // IMPORTANTE: getUser() rinfresca la sessione, auth.getSession() no.
   const { data: { user } } = await supabase.auth.getUser()
   const path = request.nextUrl.pathname
 
-  // --- LOGICA DI PROTEZIONE ---
-  if (path.startsWith('/admin') || path.startsWith('/super-admin') || path === '/dashboard') {
+  // 1. ESCLUSIONI
+  if (path === '/registrati-partner' || path.startsWith('/auth')) {
+    return response
+  }
+
+  const protectedRoutes = ['/admin', '/super-admin', '/partner', '/dashboard']
+  const isProtectedRoute = protectedRoutes.some(route => path.startsWith(route))
+  const isHome = path === '/'
+
+  if (isProtectedRoute || (isHome && user)) {
     
-    // Se non è loggato, lo mandiamo al login (tranne se è già lì)
-    if (!user) {
+    if (!user && isProtectedRoute) {
       return NextResponse.redirect(new URL('/registrati?mode=login', request.url))
     }
 
     // Recuperiamo il profilo
+    // Aggiungiamo un filtro per assicurarci di non prendere dati vecchi
     const { data: profile } = await supabase
       .from('profiles')
-      .select('is_admin')
-      .eq('owner_id', user.id)
-      .single()
+      .select('is_admin, is_partner')
+      .eq('owner_id', user?.id)
+      .maybeSingle()
 
-    // DEBUG: Questo apparirà nel tuo TERMINALE (non nel browser)
-    console.log(`[PROXY] Path: ${path} | User: ${user.email} | isAdmin: ${profile?.is_admin}`)
+    // --- DEBUG LOG: Controlla il terminale di VS Code quando carichi la pagina ---
+    console.log(`MIDDLEWARE: Path: ${path} | User: ${user?.email} | Partner: ${profile?.is_partner}`)
 
-    // BYPASS DI SICUREZZA: Se è la tua email, passa sempre (anche se il DB dà null)
-    const isSuperAdminEmail = user.email === 'admin@soulbookitalia.it' // <--- CONTROLLA CHE SIA CORRETTA
+    const isSuperAdminEmail = user?.email === 'admin@soulbookitalia.it'
+    const isAdmin = profile?.is_admin || isSuperAdminEmail
+    const isPartner = profile?.is_partner
 
-    // 1. Gestione Dashboard -> Admin
-    if (path === '/dashboard' && (profile?.is_admin || isSuperAdminEmail)) {
+    // --- LOGICA REDIRECT ---
+
+    // Se l'utente è un Partner e prova ad andare in Dashboard o Home
+    if (isPartner && (path === '/dashboard' || isHome)) {
+       return NextResponse.redirect(new URL('/partner', request.url))
+    }
+
+    // Se l'utente è un Admin e prova ad andare in Dashboard o Home
+    if (isAdmin && (path === '/dashboard' || isHome)) {
       return NextResponse.redirect(new URL('/admin', request.url))
     }
 
-    // 2. Protezione Aree Riservate
+    // Protezione Area Admin
     if (path.startsWith('/admin') || path.startsWith('/super-admin')) {
-      if (profile?.is_admin !== true && !isSuperAdminEmail) {
-        console.log("!!! ACCESSO NEGATO: Redirect a /dashboard")
+      if (!isAdmin) {
+        return NextResponse.redirect(new URL(isPartner ? '/partner' : '/dashboard', request.url))
+      }
+    }
+
+    // Protezione Area Partner
+    if (path.startsWith('/partner')) {
+      if (!isPartner && !isAdmin) {
         return NextResponse.redirect(new URL('/dashboard', request.url))
       }
     }
@@ -69,8 +92,11 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/',
     '/dashboard/:path*', 
     '/admin/:path*', 
-    '/super-admin/:path*'
+    '/super-admin/:path*',
+    '/partner/:path*', 
+    '/auth/:path*'
   ],
 }

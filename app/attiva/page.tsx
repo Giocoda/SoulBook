@@ -3,11 +3,15 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
+import ContactForm from '@/components/contactForm';
 
 export default function AttivaCodice() {
   const [code, setCode] = useState('');
   const [status, setStatus] = useState<{ type: 'idle' | 'error' | 'success', msg: string }>({ type: 'idle', msg: '' });
   const [loading, setLoading] = useState(false);
+  
+  // STATO PER IL POP-UP CONTATTI
+  const [showContact, setShowContact] = useState(false);
 
   const handleVerify = async () => {
     if (!code) return;
@@ -15,7 +19,6 @@ export default function AttivaCodice() {
     setStatus({ type: 'idle', msg: '' });
 
     try {
-      // Modificata la select per includere is_banned (gestito dal trigger nel DB)
       const { data: codeData, error: codeError } = await supabase
         .from('activation_codes')
         .select('code, is_used, agency_id, is_banned')
@@ -28,11 +31,10 @@ export default function AttivaCodice() {
         return;
       }
 
-      // --- IL NUOVO BLOCCO BAN ---
       if (codeData.is_banned === true || String(codeData.is_banned) === 'true') {
         setStatus({ type: 'error', msg: 'QUESTA KEY È STATA DISATTIVATA DEFINITIVAMENTE. CONTATTA ASSISTENZA' });
         setLoading(false);
-        return; // Blocca il passaggio a /registrati
+        return;
       }
 
       if (codeData.is_used) {
@@ -71,9 +73,9 @@ export default function AttivaCodice() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col font-sans text-slate-900">
+    <div className="min-h-screen bg-white flex flex-col font-sans text-slate-900 relative">
       
-      {/* Header con Logo stile Home Page */}
+      {/* Header con Logo */}
       <header className="w-full px-8 py-8 max-w-7xl mx-auto flex justify-start">
         <Link href="/" className="text-2xl font-black uppercase tracking-tighter italic text-slate-900">
           Soul<span className="text-slate-300">Book</span>
@@ -92,7 +94,7 @@ export default function AttivaCodice() {
             </p>
           </div>
 
-          {/* Card Simulata scurita per leggibilità */}
+          {/* Card Simulata */}
           <div className="bg-slate-100 border border-slate-200 p-8 md:p-10 rounded-[40px] shadow-sm">
             <p className="text-[11px] font-black mb-6 text-slate-500 uppercase tracking-widest italic text-center">
               Codice di Verifica
@@ -104,7 +106,6 @@ export default function AttivaCodice() {
               onChange={(e) => setCode(e.target.value)}
               disabled={status.type === 'success' || loading}
               placeholder="SB-XXXX-XXXX"
-              /* Input con sfondo bianco e bordo più marcato per risaltare sulla card grigia */
               className="w-full p-6 bg-white border-2 border-slate-200 rounded-3xl text-center font-mono text-2xl font-bold tracking-[0.2em] outline-none focus:border-slate-900 transition-all uppercase placeholder:text-slate-200 text-slate-900 shadow-inner"
             />
 
@@ -136,16 +137,41 @@ export default function AttivaCodice() {
               <span className="text-slate-700 font-bold">Contattaci per richiedere il tuo codice di attivazione.</span> 
             </p>
             
-            <Link 
-              href="/contatti" 
-              className="inline-block mt-8 px-6 py-3 border border-slate-200 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-900 hover:border-slate-900 transition-all"
+            {/* IL BOTTONE CHE APRE IL POP-UP (Niente Link href) */}
+            <button 
+              onClick={() => setShowContact(true)}
+              className="inline-block mt-8 px-6 py-3 border border-slate-200 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-900 hover:border-slate-900 transition-all cursor-pointer"
             >
               Richiedi Informazioni &rarr;
-            </Link>
+            </button>
           </div>
 
         </div>
       </div>
+
+      {/* OVERLAY CONTATTO (Z-index alto) */}
+      {showContact && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
+          {/* Sfondo con Blur */}
+          <div 
+            className="absolute inset-0 bg-[#0F172A]/80 backdrop-blur-md animate-in fade-in duration-300" 
+            onClick={() => setShowContact(false)}
+          />
+          
+          {/* Box Form */}
+          <div className="relative w-full max-w-[480px] z-10 animate-in slide-in-from-bottom-10 duration-500">
+            {/* Tasto Chiudi */}
+            <button 
+              onClick={() => setShowContact(false)}
+              className="absolute -top-12 right-0 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:text-blue-400 transition-colors"
+            >
+              Chiudi [X]
+            </button>
+            
+            <ContactForm source="Pagina_Attiva" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
