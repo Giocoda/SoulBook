@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import Link from 'next/link'
 
 function RegisterContent() {
   const searchParams = useSearchParams()
@@ -161,10 +162,13 @@ function RegisterContent() {
             </>
           )}
         </div>
-
-        <p className="text-center mt-8 text-slate-300 text-[9px] uppercase tracking-[0.4em] font-black">
-          Soulbook Italia &copy; 2026
-        </p>
+<p className="mt-6 text-[9px] text-slate-400 font-bold uppercase tracking-tight text-center leading-relaxed">
+  Cliccando su conferma, dichiari di aver preso visione della nostra <br/>
+  <Link href="/privacy" className="text-slate-900 underline hover:text-blue-600 ml-1 transition-colors">
+    Privacy & Cookie Policy
+  </Link>
+</p>
+        
       </div>
     </div>
   )

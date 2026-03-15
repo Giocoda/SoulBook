@@ -129,21 +129,37 @@ const [filterYear, setFilterYear] = useState('');
     <div className="min-h-screen bg-[#F8F9FA] p-4 md:p-10 font-sans text-slate-900">
       <div className="max-w-7xl mx-auto space-y-10">
         
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-xs font-black uppercase tracking-[0.3em] text-slate-500 flex items-center gap-2">
-              <span className="w-2 h-2 bg-slate-900 rounded-full animate-pulse"></span>
-              SoulBook / Control Panel
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <a href="/super-admin" className="text-[10px] font-black uppercase tracking-widest text-slate-900 bg-white px-5 py-2.5 rounded-xl border border-slate-200 shadow-sm transition-all flex items-center gap-2 italic">
-              💼 Gestione Partner
-            </a>
-            <button onClick={() => supabase.auth.signOut().then(() => router.push('/'))} className="text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 px-5 py-2.5 rounded-xl border border-red-100 transition-all italic">Esci</button>
-          </div>
-        </div>
+        {/* Header in stile HQ */}
+<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+  <div className="flex flex-col">
+    <div className="flex items-center gap-3">
+       <h1 className="text-4xl font-black tracking-tighter uppercase text-slate-900">
+         Soulbook <span className="text-slate-400">Admin</span>
+       </h1>
+       <div className="bg-slate-900 text-white text-[10px] font-black px-2 py-1 rounded-md tracking-widest uppercase">
+         Console
+       </div>
+    </div>
+    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-2 italic">
+      Gestione Profili & Moderazione Contenuti
+    </p>
+  </div>
+
+  <div className="flex items-center gap-3">
+    <Link 
+      href="/super-admin" 
+      className="text-[11px] font-black uppercase tracking-widest text-white bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-2xl shadow-lg shadow-blue-600/20 transition-all flex items-center gap-2 italic"
+    >
+      💼 Dashboard Partner
+    </Link>
+    <button 
+      onClick={() => supabase.auth.signOut().then(() => router.push('/'))} 
+      className="text-[11px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 px-6 py-3 rounded-2xl border border-red-100 transition-all italic"
+    >
+      Esci
+    </button>
+  </div>
+</div>
 
         {/* TABELLA PROFILI */}
         <div className="space-y-4">
@@ -187,7 +203,7 @@ const [filterYear, setFilterYear] = useState('');
                       <td className="py-4 px-6">
                         {!isRestricted ? (
                           <>
-                            <div className="text-xs font-bold text-slate-700">{p.partner_name || '—'}</div>
+              
                             <div className="text-[9px] font-black uppercase text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded inline-block mt-1 italic">
                               {p.used_code || 'N/A'}
                             </div>

@@ -138,12 +138,12 @@ export default function AttivaCodice() {
             </p>
             
             {/* IL BOTTONE CHE APRE IL POP-UP (Niente Link href) */}
-            <button 
-              onClick={() => setShowContact(true)}
-              className="inline-block mt-8 px-6 py-3 border border-slate-200 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-900 hover:border-slate-900 transition-all cursor-pointer"
-            >
-              Richiedi Informazioni &rarr;
-            </button>
+           <button 
+  onClick={() => setShowContact(true)}
+  className="inline-block mt-8 px-8 py-4 border-2 border-slate-900 bg-slate-900 rounded-full text-[11px] font-black uppercase tracking-[0.2em] text-white hover:bg-white hover:text-slate-900 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-none"
+>
+  Richiedi Informazioni &rarr;
+</button>
           </div>
 
         </div>
