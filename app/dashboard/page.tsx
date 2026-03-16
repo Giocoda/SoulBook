@@ -139,27 +139,53 @@ export default function Dashboard() {
   };
 
   const downloadQRCode = () => {
-    const svg = document.querySelector("#qr-code-download svg") as SVGGraphicsElement;
-    if (!svg) return;
-    const canvas = document.createElement("canvas");
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const img = new Image();
-    const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(svgBlob);
-    img.onload = () => {
-      canvas.width = 1000; canvas.height = 1000;
-      const ctx = canvas.getContext("2d");
-      ctx!.fillStyle = "white"; ctx!.fillRect(0, 0, canvas.width, canvas.height);
-      ctx!.drawImage(img, 50, 50, 900, 900);
-      URL.revokeObjectURL(url);
-      const pngUrl = canvas.toDataURL("image/png");
-      const downloadLink = document.createElement("a");
-      downloadLink.href = pngUrl;
-      downloadLink.download = `qrcode-${profile?.slug || 'soulbook'}.png`;
-      downloadLink.click();
-    };
-    img.src = url;
+  const svg = document.querySelector("#qr-code-download svg") as SVGGraphicsElement;
+  if (!svg) return;
+
+  const canvas = document.createElement("canvas");
+  const svgData = new XMLSerializer().serializeToString(svg);
+  const img = new Image();
+  const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(svgBlob);
+
+  img.onload = () => {
+    const size = 2000;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // 1. Sfondo Bianco
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, size, size);
+
+    // 2. QR Code (leggermente ridimensionato per dare spazio al testo)
+    const qrSize = size * 0.68; // Ridotto al 68% per aumentare il distacco
+    const qrX = (size - qrSize) / 2;
+    const qrY = size * 0.10; // Posizionato in alto
+    ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
+
+    // 3. CTA in Italic e distanziata
+    ctx.fillStyle = "#1c1917"; 
+    ctx.textAlign = "center";
+    
+    // Usiamo Bold + Italic per un look premium
+    ctx.font = "italic bold 100px sans-serif"; 
+    
+    // Il testo viene posizionato più in basso (92% dell'altezza totale)
+    ctx.fillText("Vedi Foto - Lascia una Dedica", size / 2, size * 0.88);
+
+    URL.revokeObjectURL(url);
+    
+    // 4. Download
+    const pngUrl = canvas.toDataURL("image/png");
+    const downloadLink = document.createElement("a");
+    downloadLink.href = pngUrl;
+    downloadLink.download = `soulbook-dedica-${profile?.slug || 'qr'}.png`;
+    downloadLink.click();
   };
+  img.src = url;
+};
 
   const addSeparator = async () => {
     const title = prompt("Inserisci il titolo della sezione (es: Gli anni della gioventù):");
