@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import QRCode from 'react-qr-code';
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
 
 /**
  * FUNZIONE DI SUPPORTO: Comprime e ridimensiona l'immagine lato client.
@@ -65,6 +67,105 @@ export default function Dashboard() {
   const [fontFamily, setFontFamily] = useState('sans');
   const [pageBgColor, setPageBgColor] = useState('#ffffff');
 
+// 1. Definizione della funzione del Tour
+  const runTour = () => {
+    const driverObj = driver({
+      showProgress: true,
+      animate: true,
+      overlayColor: '#0f172a', // Colore ardesia profondo per l'overlay
+      stagePadding: 10,
+      nextBtnText: 'Avanti',
+      prevBtnText: 'Indietro',
+      doneBtnText: 'Ho capito',
+      steps: [
+        { 
+          element: '#step-profile', 
+          popover: { 
+            title: '📸 Profilo e Date', 
+            description: 'Inserisci il nome, la foto e le date. Consiglio: Se non vuoi pubblicare la data di morte clicca "sempre". ', 
+            side: "bottom",
+            align: 'start'
+          } 
+          
+        },
+        { 
+          element: '#step-style', 
+          popover: { 
+            title: '🎨 Stile', 
+            description: 'Aggiungi un\' immagine di testata e scegli il colore principale e i caratteri per il profilo pubblico. Consiglio: usa il tasto visualizza online per vedere in anteprima le modifiche. Mantieni un equilibrio tra originalità e leggibilità.', 
+            side: "top",
+            align: 'start'
+          } 
+          }, 
+        { 
+          element: '#step-bio', 
+          popover: { 
+            title: '✍️ La Storia', 
+            description: 'Scegli un titolo e scrivi una frase siginificativa. Consiglio: cerca di essere sintetico ed autentico.', 
+            side: "top",
+            align: 'start'
+          } 
+        },
+        { 
+          element: '#step-gallery', 
+          popover: { 
+            title: '🖼️ Galleria', 
+            description: 'Crea l\'album fotografico della memoria con i titoli. Consiglio: prepara la storia con i titoli e le fotografie già divise. Inserici il titolo e carica il rispettivo blocco di fotografie. Ripeti l\'operazione per caricare più blocchi di fotografie con il loro titolo. Puoi riordinare le fotografie tascinandole sopra alla posizione in cui vuoi spostarle oppure eliminale con la X.', 
+            side: "top",
+            align: 'center'
+          } 
+        },
+        { 
+          element: '#step-video', 
+          popover: { 
+            title: '🎥 Video', 
+            description: 'Aggiungi un video per raccontare la storia in modo più coinvolgente. Puoi caricare un video o aggiungere un link a Youtube, Vimeo o TikTok. Consiglio: usa i link per una migliore resa.', 
+            side: "top",
+            align: 'start'
+          } 
+        },
+        { 
+          element: '#step-qr-card', 
+          popover: { 
+            title: '🏷️ QR Code Premium', 
+            description: 'Scarica il file immagine del tuo QR Code. Consiglio: condividilo in digitale oppure usa il file per una stampa eterna su ceramica per applicarlo dove preferisci.', 
+            side: "left",
+            align: 'center'
+          } 
+          
+        },
+        { 
+          element: '#step-messages', 
+          popover: { 
+            title: '💬 Messaggi', 
+            description: 'Qui puoi consultare i messaggi ricevuti: sia quelli visibili sulla pagina pubblica sia quelli privati. Puoi decidere di cancellare i messaggi pubblici se non li ritieni adeguati.Riceverai una notifica email ogni volta che qualcuno ti manda un messaggio.', 
+            side: "left",
+            align: 'center'
+          } 
+          
+        },
+      ]
+    });
+
+    driverObj.drive();
+  };
+
+  // 2. Avvio automatico al primo caricamento
+  useEffect(() => {
+    // Controlliamo se l'utente ha già visto il tour in questa sessione browser
+    const hasSeenTour = localStorage.getItem('soulbook_onboarding_v1');
+    
+    if (!hasSeenTour) {
+      // Aspettiamo un secondo che la pagina sia renderizzata bene
+      const timer = setTimeout(() => {
+        runTour();
+        localStorage.setItem('soulbook_onboarding_v1', 'true');
+      }, 1500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, []);
+  
   const qrValue = useMemo(() => {
     if (typeof window !== 'undefined' && profile?.slug) {
       return `${window.location.origin}/${profile.slug}`;
@@ -281,7 +382,7 @@ export default function Dashboard() {
           </div>
           <div className="flex bg-stone-100 p-1 rounded-xl gap-1 w-full md:w-auto">
             <button onClick={() => setActiveTab('content')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'content' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-400'}`}>Contenuti</button>
-            <button onClick={() => setActiveTab('messages')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'messages' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-400'}`}>Messaggi ({messages.length})</button>
+            <button onClick={() => setActiveTab('messages')} id="step-messages" className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'messages' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-400'}`}>Messaggi ({messages.length})</button>
           </div>
           <button onClick={() => supabase.auth.signOut().then(() => router.push('/'))} className="hidden md:block px-5 py-2.5 bg-stone-50 text-stone-400 hover:text-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest">Esci</button>
         </div>
@@ -290,171 +391,177 @@ export default function Dashboard() {
       <div className="max-w-5xl mx-auto p-6 space-y-8 mt-4">
         
         {/* BADGE AGENZIA PARTNER (SE PRESENTE) */}
-        {agency && (
-          <div className="bg-stone-800 text-white p-4 rounded-2xl flex items-center justify-between shadow-xl animate-in fade-in slide-in-from-top-4">
-            <div className="flex items-center gap-3">
-              <div className="bg-white/10 p-2 rounded-lg">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0z"></path></svg>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-stone-400">Partner Autorizzato</span>
-                <span className="text-sm font-black uppercase tracking-tight italic">{agency.name}</span>
+{agency && (
+  <div className="bg-stone-800 text-white p-4 rounded-2xl flex items-center justify-between shadow-xl animate-in fade-in slide-in-from-top-4">
+    <div className="flex items-center gap-3">
+      <div className="bg-white/10 p-2 rounded-lg">
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0z"></path></svg>
+      </div>
+      <div className="flex flex-col">
+        <span className="text-[9px] font-bold uppercase tracking-widest text-stone-400">Partner Autorizzato</span>
+        <span className="text-sm font-black uppercase tracking-tight italic">{agency.name}</span>
+      </div>
+    </div>
+    {agency.logo_url && <img src={agency.logo_url} className="h-8 opacity-50 grayscale brightness-200" alt="Agency Logo" />}
+  </div>
+)}
+
+{activeTab === 'content' ? (
+  <div className="space-y-8 animate-in fade-in duration-500">
+    
+    {/* INTESTAZIONE: PROFILO + QR CODE */}
+    <div className="grid md:grid-cols-3 gap-6">
+      {/* STEP 1: PROFILO */}
+      <div id="step-profile" className="md:col-span-2 bg-white p-8 rounded-2xl shadow-sm border border-stone-100 flex flex-col md:flex-row items-center gap-10">
+        <div className="relative group">
+          <img src={profile?.profile_image_url || 'https://via.placeholder.com/150'} className="w-36 h-36 rounded-xl object-cover border border-stone-50 shadow-md" alt="Profile" />
+          <label className="absolute -bottom-2 -right-2 bg-stone-800 text-white p-2.5 rounded-lg cursor-pointer hover:bg-stone-600 shadow-lg transition-all">
+            <input type="file" hidden accept="image/*" onChange={(e) => handleFileUpload(e, 'avatars')} />
+            <span className="text-[10px] font-bold uppercase">Foto</span>
+          </label>
+        </div>
+        <div className="flex-1 space-y-4 text-center md:text-left">
+          <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="text-3xl font-bold bg-transparent border-b border-stone-100 focus:border-stone-400 outline-none w-full" placeholder="Nome e Cognome" />
+          <div className="flex flex-wrap justify-center md:justify-start gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-[9px] font-bold uppercase text-stone-400 ml-1">Nascita</label>
+              <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className="bg-stone-50 p-2 rounded-lg text-xs font-bold outline-none border border-stone-100 h-[38px]" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[9px] font-bold uppercase text-stone-400 ml-1">Morte</label>
+              <div className="flex gap-2">
+                <input type="date" value={deathDate} onChange={(e) => setDeathDate(e.target.value)} className="bg-stone-50 p-2 rounded-lg text-xs font-bold outline-none border border-stone-100 h-[38px]" />
+                <button type="button" onClick={() => setDeathDate('')} style={{ backgroundColor: `${accentColor}15`, color: accentColor, borderColor: `${accentColor}40` }} className="px-3 h-[38px] rounded-lg text-[8px] font-black uppercase border tracking-widest hover:opacity-70 transition-all">∞ Sempre</button>
               </div>
             </div>
-            {agency.logo_url && <img src={agency.logo_url} className="h-8 opacity-50 grayscale brightness-200" alt="Agency Logo" />}
           </div>
-        )}
+        </div>
+      </div>
 
-        {activeTab === 'content' ? (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            {/* INTESTAZIONE: PROFILO + QR CODE */}
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="md:col-span-2 bg-white p-8 rounded-2xl shadow-sm border border-stone-100 flex flex-col md:flex-row items-center gap-10">
-                <div className="relative group">
-                  <img src={profile?.profile_image_url || 'https://via.placeholder.com/150'} className="w-36 h-36 rounded-xl object-cover border border-stone-50 shadow-md" alt="Profile" />
-                  <label className="absolute -bottom-2 -right-2 bg-stone-800 text-white p-2.5 rounded-lg cursor-pointer hover:bg-stone-600 shadow-lg transition-all">
-                    <input type="file" hidden accept="image/*" onChange={(e) => handleFileUpload(e, 'avatars')} />
-                    <span className="text-[10px] font-bold uppercase">Foto</span>
-                  </label>
-                </div>
-                <div className="flex-1 space-y-4 text-center md:text-left">
-                  <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="text-3xl font-bold bg-transparent border-b border-stone-100 focus:border-stone-400 outline-none w-full" placeholder="Nome e Cognome" />
-                  <div className="flex flex-wrap justify-center md:justify-start gap-4">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[9px] font-bold uppercase text-stone-400 ml-1">Nascita</label>
-                      <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className="bg-stone-50 p-2 rounded-lg text-xs font-bold outline-none border border-stone-100 h-[38px]" />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[9px] font-bold uppercase text-stone-400 ml-1">Morte</label>
-                      <div className="flex gap-2">
-                        <input type="date" value={deathDate} onChange={(e) => setDeathDate(e.target.value)} className="bg-stone-50 p-2 rounded-lg text-xs font-bold outline-none border border-stone-100 h-[38px]" />
-                        <button type="button" onClick={() => setDeathDate('')} style={{ backgroundColor: `${accentColor}15`, color: accentColor, borderColor: `${accentColor}40` }} className="px-3 h-[38px] rounded-lg text-[8px] font-black uppercase border tracking-widest hover:opacity-70 transition-all">∞ Sempre</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white p-8 rounded-2xl shadow-sm border border-stone-100 flex flex-col items-center justify-center">
-                <div id="qr-code-download" className="p-4 bg-white rounded-xl border border-stone-100 mb-4 shadow-inner">
-                  {qrValue && <QRCode value={qrValue} size={110} fgColor="#44403c" />}
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                  <p className="text-[9px] font-bold uppercase text-stone-300 tracking-widest">QR Code Profilo</p>
-                  <button onClick={downloadQRCode} className="px-3 py-1.5 bg-stone-50 hover:bg-stone-100 text-stone-500 text-[9px] font-black uppercase tracking-tighter rounded-lg border border-stone-100 transition-all flex items-center gap-2">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                    Scarica PNG
-                  </button>
-                </div>
-              </div>
+      {/* STEP 4: QR CODE */}
+      <div id="step-qr-card" className="bg-white p-8 rounded-2xl shadow-sm border border-stone-100 flex flex-col items-center justify-center">
+        <div id="qr-code-download" className="p-4 bg-white rounded-xl border border-stone-100 mb-4 shadow-inner">
+          {qrValue && <QRCode value={qrValue} size={110} fgColor="#44403c" />}
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-[9px] font-bold uppercase text-stone-300 tracking-widest">QR Code Profilo</p>
+          <button onClick={downloadQRCode} className="px-3 py-1.5 bg-stone-50 hover:bg-stone-100 text-stone-500 text-[9px] font-black uppercase tracking-tighter rounded-lg border border-stone-100 transition-all flex items-center gap-2">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            Scarica PNG
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {/* ESTETICA (Opzionale: potresti aggiungere qui id="step-style") */}
+    <div id="step-style"
+    className="bg-white p-10 rounded-2xl shadow-sm border border-stone-100 space-y-8">
+      <h3 className="text-xl font-bold uppercase tracking-wide text-stone-700">Impostazioni Estetiche</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="space-y-3">
+          <label className="text-[10px] font-bold uppercase text-stone-400 ml-1">Immagine Copertina</label>
+          <div className="relative h-44 rounded-xl bg-stone-50 border border-dashed border-stone-200 overflow-hidden group">
+            {profile?.header_bg_url ? <img src={profile.header_bg_url} className="w-full h-full object-cover" alt="Cover" /> : <div className="flex items-center justify-center h-full text-stone-300 text-xs italic">Nessuna immagine</div>}
+            <label className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-all cursor-pointer text-white text-[10px] font-bold uppercase">
+              Cambia Copertina <input type="file" hidden accept="image/*" onChange={(e) => handleFileUpload(e, 'header_covers')} />
+            </label>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <label className="text-[10px] font-bold uppercase text-stone-400 ml-1">Colore Contrasto </label>
+            <div className="flex items-center gap-3 bg-stone-50 p-3 rounded-xl border border-stone-100">
+              <input type="color" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-none bg-transparent" />
+              <input type="text" value={accentColor.toUpperCase()} onChange={(e) => setAccentColor(e.target.value)} className="bg-transparent text-[10px] font-mono font-bold w-full outline-none text-stone-500 uppercase" />
             </div>
+          </div>
+          <div className="md:col-span-2 space-y-3">
+            <label className="text-[10px] font-bold uppercase text-stone-400 ml-1">Font del Memoriale</label>
+            <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="w-full h-[54px] bg-stone-50 border border-stone-100 rounded-xl px-4 text-xs font-bold outline-none cursor-pointer">
+              <option value="sans">Moderno Pulito (Sans)</option>
+              <option value="serif">Elegante Classico (Serif)</option>
+              <option value="mono">Minimale (Mono)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
 
-            {/* ESTETICA */}
-            <div className="bg-white p-10 rounded-2xl shadow-sm border border-stone-100 space-y-8">
-              <h3 className="text-xl font-bold uppercase tracking-wide text-stone-700">Impostazioni Estetiche</h3>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-bold uppercase text-stone-400 ml-1">Immagine Copertina</label>
-                  <div className="relative h-44 rounded-xl bg-stone-50 border border-dashed border-stone-200 overflow-hidden group">
-                    {profile?.header_bg_url ? <img src={profile.header_bg_url} className="w-full h-full object-cover" alt="Cover" /> : <div className="flex items-center justify-center h-full text-stone-300 text-xs italic">Nessuna immagine</div>}
-                    <label className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-all cursor-pointer text-white text-[10px] font-bold uppercase">
-                      Cambia Copertina <input type="file" hidden accept="image/*" onChange={(e) => handleFileUpload(e, 'header_covers')} />
-                    </label>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-bold uppercase text-stone-400 ml-1">Colore Contrasto </label>
-                    <div className="flex items-center gap-3 bg-stone-50 p-3 rounded-xl border border-stone-100">
-                      <input type="color" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-none bg-transparent" />
-                      <input type="text" value={accentColor.toUpperCase()} onChange={(e) => setAccentColor(e.target.value)} className="bg-transparent text-[10px] font-mono font-bold w-full outline-none text-stone-500 uppercase" />
-                    </div>
-                  </div>
-                  <div className="md:col-span-2 space-y-3">
-                    <label className="text-[10px] font-bold uppercase text-stone-400 ml-1">Font del Memoriale</label>
-                    <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="w-full h-[54px] bg-stone-50 border border-stone-100 rounded-xl px-4 text-xs font-bold outline-none cursor-pointer">
-                      <option value="sans">Moderno Pulito (Sans)</option>
-                      <option value="serif">Elegante Classico (Serif)</option>
-                      <option value="mono">Minimale (Mono)</option>
-                    </select>
-                  </div>
-                </div>
+    {/* STEP 2: BIO */}
+    <div id="step-bio" className="bg-white p-10 rounded-2xl shadow-sm border border-stone-100 space-y-6">
+      <h3 className="text-xl font-bold uppercase tracking-wide text-stone-700">Storia e Ricordo</h3>
+      <input type="text" placeholder="Un titolo significativo..." className="w-full p-4 bg-stone-50 border border-stone-100 rounded-xl font-bold text-lg outline-none" value={bioTitle} onChange={(e) => setBioTitle(e.target.value)} />
+      <textarea className="w-full h-40 p-6 bg-stone-50 border border-stone-100 rounded-xl text-stone-600 font-medium outline-none resize-none" placeholder="Scrivi qui i momenti più belli..." value={bioContent} onChange={(e) => setBioContent(e.target.value)} />
+    </div>
+
+    {/* STEP 3: GALLERIA */}
+    <div id="step-gallery"
+      className="bg-white p-10 rounded-2xl shadow-sm border border-stone-100 transition-all"
+      onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-stone-400', 'bg-stone-50'); }}
+      onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('border-stone-400', 'bg-stone-50'); }}
+      onDrop={(e) => { 
+        e.preventDefault(); 
+        e.currentTarget.classList.remove('border-stone-400', 'bg-stone-50');
+        if (e.dataTransfer.files.length > 0) handleFileUpload(e, 'gallery'); 
+      }}
+    >
+      <div className="flex justify-between items-center mb-10">
+        <div className="space-y-1">
+          <h3 className="text-xl font-bold uppercase tracking-wide text-stone-700">Galleria Fotografica</h3>
+          <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest">Organizza la storia. Trascina le immagini per ordinarle.</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={addSeparator} className="px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase border border-stone-200 text-stone-500 hover:bg-stone-50 transition-all">+ Titolo Sezione</button>
+          <label className="bg-stone-800 text-white px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase hover:bg-stone-600 cursor-pointer shadow-md transition-all">
+            + Foto <input type="file" hidden multiple accept="image/*" onChange={(e) => handleFileUpload(e, 'gallery')} />
+          </label>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-4">
+        {galleryItems
+          .filter(i => i.type === 'image' || i.type === 'separator')
+          .sort((a, b) => (a.position || 0) - (b.position || 0))
+          .map((item) => (
+            item.type === 'separator' ? (
+              <div key={item.id} draggable className="col-span-3 md:col-span-6 py-4 flex items-center gap-4 group cursor-move">
+                <div className="h-[1px] flex-1 bg-stone-100"></div>
+                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-stone-400 bg-stone-50 px-4 py-1.5 rounded-full border border-stone-100 italic">
+                  {item.url}
+                </span>
+                <div className="h-[1px] flex-1 bg-stone-100"></div>
+                <button onClick={() => deleteItem(item)} className="opacity-0 group-hover:opacity-100 text-stone-300 hover:text-red-500 transition-all text-xs">✕</button>
               </div>
-            </div>
-
-            <div className="bg-white p-10 rounded-2xl shadow-sm border border-stone-100 space-y-6">
-              <h3 className="text-xl font-bold uppercase tracking-wide text-stone-700">Storia e Ricordo</h3>
-              <input type="text" placeholder="Un titolo significativo..." className="w-full p-4 bg-stone-50 border border-stone-100 rounded-xl font-bold text-lg outline-none" value={bioTitle} onChange={(e) => setBioTitle(e.target.value)} />
-              <textarea className="w-full h-40 p-6 bg-stone-50 border border-stone-100 rounded-xl text-stone-600 font-medium outline-none resize-none" placeholder="Scrivi qui i momenti più belli..." value={bioContent} onChange={(e) => setBioContent(e.target.value)} />
-            </div>
-
-            {/* GALLERIA */}
-            <div 
-              className="bg-white p-10 rounded-2xl shadow-sm border border-stone-100 transition-all"
-              onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-stone-400', 'bg-stone-50'); }}
-              onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('border-stone-400', 'bg-stone-50'); }}
-              onDrop={(e) => { 
-                e.preventDefault(); 
-                e.currentTarget.classList.remove('border-stone-400', 'bg-stone-50');
-                if (e.dataTransfer.files.length > 0) handleFileUpload(e, 'gallery'); 
-              }}
-            >
-              <div className="flex justify-between items-center mb-10">
-                <div className="space-y-1">
-                  <h3 className="text-xl font-bold uppercase tracking-wide text-stone-700">Galleria Fotografica</h3>
-                  <p className="text-[9px] font-bold text-stone-400 uppercase tracking-widest">Organizza la storia. Trascina le immagini per ordinarle.</p>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={addSeparator} className="px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase border border-stone-200 text-stone-500 hover:bg-stone-50 transition-all">+ Titolo Sezione</button>
-                  <label className="bg-stone-800 text-white px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase hover:bg-stone-600 cursor-pointer shadow-md transition-all">
-                    + Foto <input type="file" hidden multiple accept="image/*" onChange={(e) => handleFileUpload(e, 'gallery')} />
-                  </label>
-                </div>
+            ) : (
+              <div key={item.id} draggable
+                onDragStart={(e) => { e.dataTransfer.setData('text/plain', item.id); e.currentTarget.classList.add('opacity-40'); }}
+                onDragEnd={(e) => e.currentTarget.classList.remove('opacity-40')}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={async (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    const draggedId = e.dataTransfer.getData('text/plain');
+                    if (!draggedId || draggedId === item.id) return;
+                    const items = [...galleryItems];
+                    const draggedIdx = items.findIndex(i => i.id === draggedId);
+                    const targetIdx = items.findIndex(i => i.id === item.id);
+                    const [reorderedItem] = items.splice(draggedIdx, 1);
+                    items.splice(targetIdx, 0, reorderedItem);
+                    const updatedItems = items.map((img, index) => ({ ...img, position: index }));
+                    setGalleryItems(updatedItems);
+                    await supabase.from('gallery_items').upsert(updatedItems.map(img => ({ id: img.id, position: img.position, owner_id: img.owner_id, url: img.url, type: img.type })));
+                }}
+                className="group relative aspect-square rounded-lg overflow-hidden border border-stone-100 shadow-sm cursor-move bg-stone-50 transition-all active:scale-95"
+              >
+                <img src={item.url} className="w-full h-full object-cover pointer-events-none select-none" alt="" />
+                <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteItem(item); }} className="absolute top-1 right-1 bg-white/90 text-stone-400 w-6 h-6 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 hover:text-red-600 text-[10px] transition-all z-30 shadow-sm">✕</button>
               </div>
-
-              <div className="grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-4">
-                {galleryItems
-                  .filter(i => i.type === 'image' || i.type === 'separator')
-                  .sort((a, b) => (a.position || 0) - (b.position || 0))
-                  .map((item) => (
-                    item.type === 'separator' ? (
-                      <div key={item.id} draggable className="col-span-3 md:col-span-6 py-4 flex items-center gap-4 group cursor-move">
-                        <div className="h-[1px] flex-1 bg-stone-100"></div>
-                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-stone-400 bg-stone-50 px-4 py-1.5 rounded-full border border-stone-100 italic">
-                          {item.url}
-                        </span>
-                        <div className="h-[1px] flex-1 bg-stone-100"></div>
-                        <button onClick={() => deleteItem(item)} className="opacity-0 group-hover:opacity-100 text-stone-300 hover:text-red-500 transition-all text-xs">✕</button>
-                      </div>
-                    ) : (
-                      <div key={item.id} draggable
-                        onDragStart={(e) => { e.dataTransfer.setData('text/plain', item.id); e.currentTarget.classList.add('opacity-40'); }}
-                        onDragEnd={(e) => e.currentTarget.classList.remove('opacity-40')}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={async (e) => {
-                            e.preventDefault(); e.stopPropagation();
-                            const draggedId = e.dataTransfer.getData('text/plain');
-                            if (!draggedId || draggedId === item.id) return;
-                            const items = [...galleryItems];
-                            const draggedIdx = items.findIndex(i => i.id === draggedId);
-                            const targetIdx = items.findIndex(i => i.id === item.id);
-                            const [reorderedItem] = items.splice(draggedIdx, 1);
-                            items.splice(targetIdx, 0, reorderedItem);
-                            const updatedItems = items.map((img, index) => ({ ...img, position: index }));
-                            setGalleryItems(updatedItems);
-                            await supabase.from('gallery_items').upsert(updatedItems.map(img => ({ id: img.id, position: img.position, owner_id: img.owner_id, url: img.url, type: img.type })));
-                        }}
-                        className="group relative aspect-square rounded-lg overflow-hidden border border-stone-100 shadow-sm cursor-move bg-stone-50 transition-all active:scale-95"
-                      >
-                        <img src={item.url} className="w-full h-full object-cover pointer-events-none select-none" alt="" />
-                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteItem(item); }} className="absolute top-1 right-1 bg-white/90 text-stone-400 w-6 h-6 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 hover:text-red-600 text-[10px] transition-all z-30 shadow-sm">✕</button>
-                      </div>
-                    )
+                )
                   ))}
-              </div>
-            </div>
-
-            {/* VIDEO */}
-            <div className="bg-white p-10 rounded-2xl shadow-sm border border-stone-100">
+      </div>
+    </div>
+{/* VIDEO */}
+            <div id="step-video"
+            className="bg-white p-10 rounded-2xl shadow-sm border border-stone-100">
               <h3 className="text-xl font-bold uppercase tracking-wide text-stone-700 mb-10">Video e Ricordi Multimediali</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {galleryItems.filter(i => i.type === 'video' || i.type === 'video_file').map((item, i) => (
@@ -475,8 +582,10 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
+              </div>
+               </div>
+               
+          
         ) : (
           /* MESSAGGI */
           <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 text-stone-800">
@@ -530,6 +639,15 @@ export default function Dashboard() {
             <span className="text-[10px] font-bold uppercase tracking-widest italic">Tutte le modifiche sono istantanee</span>
           </div>
           <div className="flex gap-3 w-full md:w-auto">
+          <button 
+  onClick={runTour} 
+  className="flex items-center gap-2 px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-xl text-[10px] font-bold uppercase transition-all shadow-sm border border-stone-200"
+>
+  <svg className="w-3.5 h-3.5 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.443 1.103m-3.13 0c.152.017.3.028.443.028.542 0 1-.442 1-1 0-.558-.458-1-1-1a1.001 1.001 0 00-1 1zM12 17h.01" />
+  </svg>
+  Guida Rapida
+</button>
             <a href={`/${profile?.slug}`} target="_blank" className="flex-1 md:flex-none px-6 py-4 bg-stone-100 text-stone-600 rounded-xl text-[10px] font-bold uppercase hover:bg-stone-200 transition-all text-center">Visualizza Online</a>
             <button onClick={saveProfileData} disabled={isSaving} className="flex-[2] md:flex-none px-12 py-4 bg-stone-800 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-stone-900 shadow-md transition-all disabled:opacity-50">
               {isSaving ? 'Salvataggio...' : 'Salva Profilo'}
