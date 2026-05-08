@@ -187,12 +187,15 @@ const handleDeleteBatch = async (agencyId: string, batchName: string) => {
  // Fetch Log Globali (Unione manuale per evitare errori di relazione DB)
   const fetchGlobalLogs = useCallback(async () => {
   try {
+    // 1. QUERY CHIAVI: Recuperiamo esplicitamente activated_at
     const { data: codes, error: codesError } = await supabase
       .from('activation_codes')
       .select(`
         code,
         is_delivered,
         batch_name,
+        created_at,
+        activated_at, 
         agencies (
           name,
           is_banned
@@ -202,22 +205,26 @@ const handleDeleteBatch = async (agencyId: string, batchName: string) => {
 
     if (codesError) throw codesError;
 
-    // DEBUG: Aggiungi questo log temporaneo per vedere cosa arriva davvero da Supabase
-    console.log("Dati grezzi da Supabase:", codes.slice(0, 5)); 
-
+    // 2. QUERY PROFILI: Recuperiamo anche created_at come backup
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('full_name, slug, used_code')
+      .select('full_name, slug, used_code, created_at')
       .not('used_code', 'is', null);
 
-    const safeProfiles = profiles || [];
+    if (profilesError) throw profilesError;
 
-    const enrichedLogs = codes.map(codeItem => ({
-      ...codeItem,
-      // Se batch_name è null nel DB, lo forziamo a "Diretta" per i codici Soulbook
-      batch_name: codeItem.batch_name || (codeItem.agencies ? "Standard" : "Stock Interno"),
-      profiles: safeProfiles.find(p => p.used_code === codeItem.code) || null
-    }));
+    // 3. UNIONE DEI DATI
+    const enrichedLogs = (codes as any[]).map(codeItem => {
+      const userProfile = profiles?.find(p => p.used_code === codeItem.code) || null;
+      
+      return {
+        ...codeItem,
+        batch_name: codeItem.batch_name || (codeItem.agencies ? "Standard" : "Stock Interno"),
+        profiles: userProfile,
+        // CRITICO: Se activated_at della chiave è nullo, usiamo la data del profilo
+        activated_at: codeItem.activated_at || userProfile?.created_at || null 
+      };
+    });
 
     setGlobalLogs(enrichedLogs);
   } catch (error: any) {

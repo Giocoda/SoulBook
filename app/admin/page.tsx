@@ -173,72 +173,93 @@ const [filterYear, setFilterYear] = useState('');
 
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-200">
-                  <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-left">Profilo</th>
-                  <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-left">Partner / Key</th>
-                  <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Stato</th>
-                  <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Azioni</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {paginatedProfiles.map((p) => {
-                  const isRestricted = p.is_admin || p.is_partner;
-                  return (
-                    <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-2">
-                          <div className="font-bold text-slate-900 text-sm">{p.full_name}</div>
-                          {p.is_admin && <span className="bg-slate-900 text-white text-[7px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter">Admin</span>}
-                          {p.is_partner && <span className="bg-blue-600 text-white text-[7px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter">Partner</span>}
-                        </div>
-                        {!isRestricted ? (
-                          <div className="text-[10px] text-slate-400 font-mono italic">/{p.slug}</div>
-                        ) : (
-                          <div className="text-[9px] text-red-400 font-black uppercase tracking-widest mt-1">Account Riservato</div>
-                        )}
-                        <div className="text-[10px] text-slate-400">{p.user_email}</div>
-                      </td>
+  <thead>
+    <tr className="bg-slate-50/50 border-b border-slate-200">
+      <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-left">Profilo</th>
+      <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-left">Partner / Key</th>
+      <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Stato</th>
+      {/* Intestazione per la nuova colonna */}
+      <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Data Registrazione</th>
+      <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Azioni</th>
+    </tr>
+  </thead>
+  <tbody className="divide-y divide-slate-100">
+    {paginatedProfiles.map((p) => {
+      const isRestricted = p.is_admin || p.is_partner;
+      
+      // Formattazione della data dal campo created_at
+      const registrationDate = p.created_at 
+        ? new Date(p.created_at).toLocaleDateString('it-IT', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          })
+        : 'N/D';
 
-                      <td className="py-4 px-6">
-                        {!isRestricted ? (
-                          <>
-              
-                            <div className="text-[9px] font-black uppercase text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded inline-block mt-1 italic">
-                              {p.used_code || 'N/A'}
-                            </div>
-                          </>
-                        ) : <span className="text-slate-300">—</span>}
-                      </td>
+      return (
+        <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+          <td className="py-4 px-6">
+            <div className="flex items-center gap-2">
+              <div className="font-bold text-slate-900 text-sm">{p.full_name}</div>
+              {p.is_admin && <span className="bg-slate-900 text-white text-[7px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter">Admin</span>}
+              {p.is_partner && <span className="bg-blue-600 text-white text-[7px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter">Partner</span>}
+            </div>
+            {!isRestricted ? (
+              <div className="text-[10px] text-slate-400 font-mono italic">/{p.slug}</div>
+            ) : (
+              <div className="text-[9px] text-red-400 font-black uppercase tracking-widest mt-1">Account Riservato</div>
+            )}
+            <div className="text-[10px] text-slate-400">{p.user_email}</div>
+          </td>
 
-                      <td className="py-4 px-6 text-center">
-                        <span className={`px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-tighter border ${p.is_published ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                          {p.is_published ? 'LIVE' : 'OFFLINE'}
-                        </span>
-                      </td>
+          <td className="py-4 px-6">
+            {!isRestricted ? (
+              <div className="text-[9px] font-black uppercase text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded inline-block mt-1 italic">
+                {p.used_code || 'N/A'}
+              </div>
+            ) : <span className="text-slate-300">—</span>}
+          </td>
 
-                      <td className="py-4 px-6 text-right space-x-2">
-                        {!isRestricted && (
-                          <>
-                            <Link href={`/${p.slug}`} target="_blank" className="inline-block p-2 text-slate-400 hover:text-slate-900">👁️</Link>
-                            <button onClick={() => deleteUserComplete(p)} className="p-2 text-slate-300 hover:text-red-600">🗑️</button>
-                          </>
-                        )}
-                        <button 
-                          onClick={() => toggleVisibility(p.id, p.is_published)}
-                          disabled={isRestricted}
-                          className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${
-                            isRestricted ? 'opacity-20 cursor-not-allowed' : 'hover:bg-slate-900 hover:text-white border-slate-200'
-                          }`}
-                        >
-                          {p.is_admin ? 'ADMIN' : p.is_partner ? 'PARTNER' : p.is_published ? 'Sospendi' : 'Attiva'}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <td className="py-4 px-6 text-center">
+            <span className={`px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-tighter border ${p.is_published ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+              {p.is_published ? 'LIVE' : 'OFFLINE'}
+            </span>
+          </td>
+
+          {/* Colonna Data Registrazione */}
+          <td className="py-4 px-6 text-center">
+            <div className="flex flex-col items-center">
+              <span className="text-[11px] font-black text-slate-900 uppercase italic leading-tight">
+                {registrationDate}
+              </span>
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
+                Registrato
+              </span>
+            </div>
+          </td>
+
+          <td className="py-4 px-6 text-right space-x-2">
+            {!isRestricted && (
+              <>
+                <Link href={`/${p.slug}`} target="_blank" className="inline-block p-2 text-slate-400 hover:text-slate-900">👁️</Link>
+                <button onClick={() => deleteUserComplete(p)} className="p-2 text-slate-300 hover:text-red-600">🗑️</button>
+              </>
+            )}
+            <button 
+              onClick={() => toggleVisibility(p.id, p.is_published)}
+              disabled={isRestricted}
+              className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${
+                isRestricted ? 'opacity-20 cursor-not-allowed' : 'hover:bg-slate-900 hover:text-white border-slate-200'
+              }`}
+            >
+              {p.is_admin ? 'ADMIN' : p.is_partner ? 'PARTNER' : p.is_published ? 'Sospendi' : 'Attiva'}
+            </button>
+          </td>
+        </tr>
+      );
+    })}
+  </tbody>
+</table>
             
             {/* Paginazione */}
             <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center px-6">

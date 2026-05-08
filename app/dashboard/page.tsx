@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import QRCode from 'react-qr-code';
 import { driver } from "driver.js";
+// @ts-ignore
 import "driver.js/dist/driver.css";
 
 /**
