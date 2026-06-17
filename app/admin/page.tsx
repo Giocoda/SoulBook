@@ -129,21 +129,37 @@ const [filterYear, setFilterYear] = useState('');
     <div className="min-h-screen bg-[#F8F9FA] p-4 md:p-10 font-sans text-slate-900">
       <div className="max-w-7xl mx-auto space-y-10">
         
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-xs font-black uppercase tracking-[0.3em] text-slate-500 flex items-center gap-2">
-              <span className="w-2 h-2 bg-slate-900 rounded-full animate-pulse"></span>
-              SoulBook / Control Panel
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <a href="/super-admin" className="text-[10px] font-black uppercase tracking-widest text-slate-900 bg-white px-5 py-2.5 rounded-xl border border-slate-200 shadow-sm transition-all flex items-center gap-2 italic">
-              💼 Gestione Partner
-            </a>
-            <button onClick={() => supabase.auth.signOut().then(() => router.push('/'))} className="text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 px-5 py-2.5 rounded-xl border border-red-100 transition-all italic">Esci</button>
-          </div>
-        </div>
+        {/* Header in stile HQ */}
+<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+  <div className="flex flex-col">
+    <div className="flex items-center gap-3">
+       <h1 className="text-4xl font-black tracking-tighter uppercase text-slate-900">
+         Soulbook <span className="text-slate-400">Admin</span>
+       </h1>
+       <div className="bg-slate-900 text-white text-[10px] font-black px-2 py-1 rounded-md tracking-widest uppercase">
+         Console
+       </div>
+    </div>
+    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-2 italic">
+      Gestione Profili & Moderazione Contenuti
+    </p>
+  </div>
+
+  <div className="flex items-center gap-3">
+    <Link 
+      href="/super-admin" 
+      className="text-[11px] font-black uppercase tracking-widest text-white bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-2xl shadow-lg shadow-blue-600/20 transition-all flex items-center gap-2 italic"
+    >
+      💼 Dashboard Partner
+    </Link>
+    <button 
+      onClick={() => supabase.auth.signOut().then(() => router.push('/'))} 
+      className="text-[11px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 px-6 py-3 rounded-2xl border border-red-100 transition-all italic"
+    >
+      Esci
+    </button>
+  </div>
+</div>
 
         {/* TABELLA PROFILI */}
         <div className="space-y-4">
@@ -157,72 +173,93 @@ const [filterYear, setFilterYear] = useState('');
 
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-200">
-                  <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-left">Profilo</th>
-                  <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-left">Partner / Key</th>
-                  <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Stato</th>
-                  <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Azioni</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {paginatedProfiles.map((p) => {
-                  const isRestricted = p.is_admin || p.is_partner;
-                  return (
-                    <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-2">
-                          <div className="font-bold text-slate-900 text-sm">{p.full_name}</div>
-                          {p.is_admin && <span className="bg-slate-900 text-white text-[7px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter">Admin</span>}
-                          {p.is_partner && <span className="bg-blue-600 text-white text-[7px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter">Partner</span>}
-                        </div>
-                        {!isRestricted ? (
-                          <div className="text-[10px] text-slate-400 font-mono italic">/{p.slug}</div>
-                        ) : (
-                          <div className="text-[9px] text-red-400 font-black uppercase tracking-widest mt-1">Account Riservato</div>
-                        )}
-                        <div className="text-[10px] text-slate-400">{p.user_email}</div>
-                      </td>
+  <thead>
+    <tr className="bg-slate-50/50 border-b border-slate-200">
+      <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-left">Profilo</th>
+      <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-left">Partner / Key</th>
+      <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Stato</th>
+      {/* Intestazione per la nuova colonna */}
+      <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Data Registrazione</th>
+      <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Azioni</th>
+    </tr>
+  </thead>
+  <tbody className="divide-y divide-slate-100">
+    {paginatedProfiles.map((p) => {
+      const isRestricted = p.is_admin || p.is_partner;
+      
+      // Formattazione della data dal campo created_at
+      const registrationDate = p.created_at 
+        ? new Date(p.created_at).toLocaleDateString('it-IT', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          })
+        : 'N/D';
 
-                      <td className="py-4 px-6">
-                        {!isRestricted ? (
-                          <>
-                            <div className="text-xs font-bold text-slate-700">{p.partner_name || '—'}</div>
-                            <div className="text-[9px] font-black uppercase text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded inline-block mt-1 italic">
-                              {p.used_code || 'N/A'}
-                            </div>
-                          </>
-                        ) : <span className="text-slate-300">—</span>}
-                      </td>
+      return (
+        <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+          <td className="py-4 px-6">
+            <div className="flex items-center gap-2">
+              <div className="font-bold text-slate-900 text-sm">{p.full_name}</div>
+              {p.is_admin && <span className="bg-slate-900 text-white text-[7px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter">Admin</span>}
+              {p.is_partner && <span className="bg-blue-600 text-white text-[7px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter">Partner</span>}
+            </div>
+            {!isRestricted ? (
+              <div className="text-[10px] text-slate-400 font-mono italic">/{p.slug}</div>
+            ) : (
+              <div className="text-[9px] text-red-400 font-black uppercase tracking-widest mt-1">Account Riservato</div>
+            )}
+            <div className="text-[10px] text-slate-400">{p.user_email}</div>
+          </td>
 
-                      <td className="py-4 px-6 text-center">
-                        <span className={`px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-tighter border ${p.is_published ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                          {p.is_published ? 'LIVE' : 'OFFLINE'}
-                        </span>
-                      </td>
+          <td className="py-4 px-6">
+            {!isRestricted ? (
+              <div className="text-[9px] font-black uppercase text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded inline-block mt-1 italic">
+                {p.used_code || 'N/A'}
+              </div>
+            ) : <span className="text-slate-300">—</span>}
+          </td>
 
-                      <td className="py-4 px-6 text-right space-x-2">
-                        {!isRestricted && (
-                          <>
-                            <Link href={`/${p.slug}`} target="_blank" className="inline-block p-2 text-slate-400 hover:text-slate-900">👁️</Link>
-                            <button onClick={() => deleteUserComplete(p)} className="p-2 text-slate-300 hover:text-red-600">🗑️</button>
-                          </>
-                        )}
-                        <button 
-                          onClick={() => toggleVisibility(p.id, p.is_published)}
-                          disabled={isRestricted}
-                          className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${
-                            isRestricted ? 'opacity-20 cursor-not-allowed' : 'hover:bg-slate-900 hover:text-white border-slate-200'
-                          }`}
-                        >
-                          {p.is_admin ? 'ADMIN' : p.is_partner ? 'PARTNER' : p.is_published ? 'Sospendi' : 'Attiva'}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <td className="py-4 px-6 text-center">
+            <span className={`px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-tighter border ${p.is_published ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+              {p.is_published ? 'LIVE' : 'OFFLINE'}
+            </span>
+          </td>
+
+          {/* Colonna Data Registrazione */}
+          <td className="py-4 px-6 text-center">
+            <div className="flex flex-col items-center">
+              <span className="text-[11px] font-black text-slate-900 uppercase italic leading-tight">
+                {registrationDate}
+              </span>
+              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
+                Registrato
+              </span>
+            </div>
+          </td>
+
+          <td className="py-4 px-6 text-right space-x-2">
+            {!isRestricted && (
+              <>
+                <Link href={`/${p.slug}`} target="_blank" className="inline-block p-2 text-slate-400 hover:text-slate-900">👁️</Link>
+                <button onClick={() => deleteUserComplete(p)} className="p-2 text-slate-300 hover:text-red-600">🗑️</button>
+              </>
+            )}
+            <button 
+              onClick={() => toggleVisibility(p.id, p.is_published)}
+              disabled={isRestricted}
+              className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${
+                isRestricted ? 'opacity-20 cursor-not-allowed' : 'hover:bg-slate-900 hover:text-white border-slate-200'
+              }`}
+            >
+              {p.is_admin ? 'ADMIN' : p.is_partner ? 'PARTNER' : p.is_published ? 'Sospendi' : 'Attiva'}
+            </button>
+          </td>
+        </tr>
+      );
+    })}
+  </tbody>
+</table>
             
             {/* Paginazione */}
             <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center px-6">

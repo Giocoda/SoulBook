@@ -176,6 +176,16 @@ function AuthContent() {
             <button disabled={loading} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] hover:bg-slate-800 transition-all shadow-xl shadow-slate-100 disabled:bg-slate-100 mt-6">
               {loading ? 'Elaborazione...' : mode === 'signup' ? 'Registrati e Attiva' : 'Entra nella Dashboard'}
             </button>
+          {/* AGGIUNGI QUESTO BLOCCO */}
+{mode === 'signup' && (
+  <p className="mt-6 text-[9px] text-slate-400 font-bold uppercase tracking-tight text-center leading-relaxed">
+    Procedendo con la registrazione accetti la nostra <br/>
+    <Link href="/privacy" className="text-slate-900 underline hover:text-blue-600 ml-1 transition-colors">
+      Privacy & Cookie Policy
+    </Link>
+  </p>
+  )}
+          
           </form>
 
           <div className="mt-8 text-center">

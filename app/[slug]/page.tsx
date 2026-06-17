@@ -346,38 +346,53 @@ export default function PublicProfile({ params }: { params: Promise<{ slug: stri
                     ref={scrollRef} 
                     className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar gap-6 md:gap-12 pb-10 cursor-grab active:cursor-grabbing"
                   >
-                    {gallery
-                      .filter(i => i.type === 'image' || i.type === 'separator')
-                      .map((item, idx) => (
-                        <div key={idx} className="snap-center shrink-0 w-[85vw] md:w-[500px]">
-                          {item.type === 'separator' ? (
-                            /* RENDERING SEPARATORE (Pagina Libro) */
-                            <div className="bg-white p-6 md:p-10 shadow-sm border border-slate-100 h-full flex flex-col justify-center items-center text-center">
-                              <div className="aspect-[4/5] w-full flex flex-col justify-center items-center border-[0.5px] border-slate-100 p-8 space-y-6">
-                                <div className="w-8 h-[1px]" style={{ backgroundColor: profile.accent_color }}></div>
-                                <h3 className="text-2xl md:text-3xl font-serif italic tracking-tight leading-relaxed" style={{ color: profile.accent_color }}>
-                                  {item.url}
-                                </h3>
-                                <div className="w-8 h-[1px]" style={{ backgroundColor: profile.accent_color }}></div>
-                              </div>
-                            </div>
-                          ) : (
-                            /* RENDERING FOTO (Stile Polaroid) */
-                            <div className="bg-white p-4 md:p-6 shadow-sm border border-slate-100 relative group transition-transform duration-500 hover:scale-[1.01]">
-                              <div className="aspect-[4/5] relative border border-slate-200 p-2 md:p-3">
-                                <div className="absolute inset-1 border-[0.5px] opacity-10" style={{ borderColor: profile.accent_color }}></div>
-                                <div className="w-full h-full overflow-hidden bg-slate-50">
-                                  <img src={item.url} className="w-full h-full object-cover" alt="" />
-                                </div>
-                              </div>
-                              <div className="mt-6 flex justify-between items-baseline px-1 opacity-30">
-                                <span className="text-[8px] font-black uppercase tracking-widest text-slate-600">Memory Book</span>
-                                <span className="text-[9px] font-mono text-slate-400" style={{ color: profile.accent_color }}>{idx + 1}</span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+            
+
+{gallery
+  .filter(i => i.type === 'image' || i.type === 'separator')
+  .map((item, idx) => (
+    /* Cambiato: w-auto invece di w-[500px] per permettere 
+       al contenitore di adattarsi alla larghezza dell'immagine 
+    */
+    <div key={idx} className="snap-center shrink-0 w-auto min-w-[300px] max-w-[95vw]">
+      {item.type === 'separator' ? (
+        /* RENDERING SEPARATORE - Rimane fisso per coerenza */
+        <div className="bg-white p-6 md:p-10 shadow-sm border border-slate-100 h-full flex flex-col justify-center items-center text-center w-[85vw] md:w-[500px]">
+          <div className="aspect-[4/5] w-full flex flex-col justify-center items-center border-[0.5px] border-slate-100 p-8 space-y-6">
+            <div className="w-8 h-[1px]" style={{ backgroundColor: profile.accent_color }}></div>
+            <h3 className="text-2xl md:text-3xl font-serif italic tracking-tight leading-relaxed" style={{ color: profile.accent_color }}>
+              {item.url}
+            </h3>
+            <div className="w-8 h-[1px]" style={{ backgroundColor: profile.accent_color }}></div>
+          </div>
+        </div>
+      ) : (
+        /* RENDERING FOTO (Stile Polaroid Dinamica) */
+        <div className="bg-white p-4 md:p-6 shadow-sm border border-slate-100 relative group transition-transform duration-500 hover:scale-[1.01]">
+          {/* MODIFICA CHIAVE: 
+              - Tolto aspect-[4/5]
+              - Impostata altezza fissa h-[400px] o h-[500px]
+              - Larghezza w-auto
+          */}
+          <div className="h-[350px] md:h-[500px] w-auto relative border border-slate-200 p-2 md:p-3 flex items-center justify-center">
+            <div className="absolute inset-1 border-[0.5px] opacity-10 pointer-events-none" style={{ borderColor: profile.accent_color }}></div>
+            <div className="h-full w-auto overflow-hidden bg-slate-50">
+              <img 
+                src={item.url} 
+                className="h-full w-auto object-contain" // object-contain non taglia mai
+                alt="" 
+              />
+            </div>
+          </div>
+          <div className="mt-6 flex justify-between items-baseline px-1 opacity-30">
+            <span className="text-[8px] font-black uppercase tracking-widest text-slate-600">Memory Book</span>
+            <span className="text-[9px] font-mono text-slate-400" style={{ color: profile.accent_color }}>{idx + 1}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  ))}
+
                   </div>
                 </div>
               </div>
